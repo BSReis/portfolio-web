@@ -309,6 +309,9 @@ export default function StockDetailScreen({ route, navigation }: Props) {
   // Edit / delete transaction overlay state
   const [editTx, setEditTx] = useState<{ id: string; type: 'buy' | 'sell' } | null>(null);
   const [deleteTxId, setDeleteTxId] = useState<string | null>(null);
+  const [txKebabPos, setTxKebabPos] = useState<{ top: number; right: number } | null>(null);
+  const [txKebabId, setTxKebabId] = useState<string | null>(null);
+  const closeTxKebab = () => { setTxKebabPos(null); setTxKebabId(null); };
   const [editShares, setEditShares] = useState('');
   const [editPrice, setEditPrice] = useState('');
   const [editFee, setEditFee] = useState('');
@@ -501,7 +504,7 @@ export default function StockDetailScreen({ route, navigation }: Props) {
 
   useEffect(() => {
     setChartLoading(true);
-    const { range, interval } = showCustomRange ? { range: 'max', interval: '1d' } : WIDE_PARAMS[selectedPeriod];
+    const { range, interval } = showCustomRange ? { range: 'max', interval: '1d' } : CANDLE_PARAMS[selectedPeriod];
     getHistoricalData(symbol, range, interval)
       .then((data) => { setFullData(data); })
       .catch(() => {})
@@ -1295,7 +1298,7 @@ export default function StockDetailScreen({ route, navigation }: Props) {
                     </View>
                   </View>
                   <Text style={{ color: '#8f99aa', fontSize: 11, marginTop: 4 }}>
-                    Your assumption of the company's expected yearly EPS growth rate as a percentage (e.g., 10 for 10% per year).
+                    Your assumption of the company&apos;s expected yearly EPS growth rate as a percentage (e.g., 10 for 10% per year).
                   </Text>
                 </View>
 
@@ -1348,7 +1351,7 @@ export default function StockDetailScreen({ route, navigation }: Props) {
                 </Text>
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                   <View style={{ flex: 1, backgroundColor: '#0f172a', borderRadius: 10, padding: 12 }}>
-                    <Text style={{ color: '#64748b', fontSize: 11, marginBottom: 4 }}>Return from today's price</Text>
+                    <Text style={{ color: '#64748b', fontSize: 11, marginBottom: 4 }}>Return from today&apos;s price</Text>
                     <Text style={{
                       fontSize: 22, fontWeight: '800',
                       color: returnFromToday == null ? '#475569' : returnFromToday >= 0 ? '#22c55e' : '#ef4444',
@@ -3085,6 +3088,50 @@ export default function StockDetailScreen({ route, navigation }: Props) {
               : null;
             const txPositive = txGainAbs !== null && txGainAbs >= 0;
             const dimmed = fullyConsumed;
+            if (isDesktop) {
+              return (
+                <View key={tx.id} style={[styles.txRow, dimmed && { opacity: 0.45 }, { flexDirection: 'row', alignItems: 'center' }]}>
+                  <View style={[styles.txBadge, { backgroundColor: tx.type === 'buy' ? '#16a34a22' : '#dc262622' }]}>
+                    <Text style={[styles.txBadgeTxt, { color: tx.type === 'buy' ? '#22c55e' : '#ef4444' }]}>
+                      {tx.type === 'buy' ? 'Buy' : 'Sell'}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <BlurValue hidden={hideValues} style={{ alignSelf: 'flex-start' }}>
+                      <Text style={[styles.txShares, dimmed && { color: '#64748b' }]}>
+                        {tx.shares % 1 === 0 ? tx.shares.toFixed(0) : tx.shares.toFixed(4).replace(/\.?0+$/, '')} shares
+                      </Text>
+                    </BlurValue>
+                    <Text style={styles.txDate}>{new Date(tx.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</Text>
+                    {fullyConsumed && <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Position sold (FIFO)</Text>}
+                    {partiallyConsumed && lot && (
+                      <Text style={{ fontSize: 11, color: '#f59e0b', marginTop: 2 }}>
+                        {lot.soldShares % 1 === 0 ? lot.soldShares.toFixed(0) : lot.soldShares.toFixed(2)} sold · {lot.remainingShares % 1 === 0 ? lot.remainingShares.toFixed(0) : lot.remainingShares.toFixed(2)} remaining
+                      </Text>
+                    )}
+                  </View>
+                  <View style={{ alignItems: 'flex-end', marginRight: 8 }}>
+                    <Text style={[styles.txPrice, dimmed && { color: '#64748b' }]}>{tx.price.toFixed(2)} {nativeCurrencySymbol}</Text>
+                    {txGainAbs !== null && txGainPct !== null && !fullyConsumed && (
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: txPositive ? '#22c55e' : '#ef4444', marginTop: 2 }}>
+                        {!hideValues && `${txPositive ? '+' : ''}${txGainAbs.toFixed(2)} ${currencySymbol} `}({txPositive ? '+' : ''}{txGainPct.toFixed(2)}%)
+                      </Text>
+                    )}
+                  </View>
+                  <TouchableOpacity
+                    style={{ padding: 6, borderRadius: 6 }}
+                    onPress={(e) => {
+                      const { clientX, clientY } = e.nativeEvent as any;
+                      setTxKebabPos({ top: (clientY ?? 0) + 8, right: window.innerWidth - (clientX ?? 0) });
+                      setTxKebabId(tx.id);
+                    }}
+                    hitSlop={8}
+                  >
+                    <Ionicons name="ellipsis-vertical" size={18} color="#64748b" />
+                  </TouchableOpacity>
+                </View>
+              );
+            }
             return (
               <ReanimatedSwipeable
                 key={tx.id}
@@ -4361,16 +4408,80 @@ export default function StockDetailScreen({ route, navigation }: Props) {
       </View>
     </ScrollView>
 
+    {/* Kebab popover for transaction rows on desktop */}
+    <Modal
+      visible={txKebabPos !== null}
+      transparent
+      animationType="none"
+      onRequestClose={closeTxKebab}
+    >
+      <Pressable style={StyleSheet.absoluteFillObject} onPress={closeTxKebab}>
+        <Pressable
+          style={{
+            position: 'absolute',
+            top: txKebabPos?.top ?? 0,
+            right: txKebabPos?.right ?? 0,
+            backgroundColor: '#1e293b',
+            borderRadius: 12,
+            paddingVertical: 6,
+            minWidth: 160,
+            shadowColor: '#000',
+            shadowOpacity: 0.5,
+            shadowRadius: 20,
+            shadowOffset: { width: 0, height: 6 },
+          }}
+          onPress={() => {}}
+        >
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14 }}
+            onPress={() => {
+              const tx = myTxs.find(t => t.id === txKebabId);
+              closeTxKebab();
+              if (tx) {
+                if (isCombinedPortfolio) { Alert.alert('Read-only', 'Select a specific portfolio before editing transactions.'); return; }
+                openEditTx(tx);
+              }
+            }}
+          >
+            <Ionicons name="pencil-outline" size={16} color="#94a3b8" style={{ marginRight: 10 }} />
+            <Text style={{ color: '#f1f5f9', fontSize: 14 }}>Edit</Text>
+          </TouchableOpacity>
+          <View style={{ height: 1, backgroundColor: '#334155', marginVertical: 2 }} />
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14 }}
+            onPress={() => {
+              const id = txKebabId;
+              closeTxKebab();
+              if (id) {
+                if (isCombinedPortfolio) { Alert.alert('Read-only', 'Select a specific portfolio before deleting transactions.'); return; }
+                confirmDeleteTx(id);
+              }
+            }}
+          >
+            <Ionicons name="trash-outline" size={16} color="#ef4444" style={{ marginRight: 10 }} />
+            <Text style={{ color: '#ef4444', fontSize: 14 }}>Delete</Text>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
+
     {/* Modal — adicionar transação */}
-    {txModalVisible && (
-      <AddTransactionModal
-        symbol={symbol}
-        name={name}
-        initialPrice={nativePrice > 0 ? nativePrice.toFixed(2) : ''}
-        nativeCurrencySymbol={nativeCurrencySymbol}
-        onClose={() => setTxModalVisible(false)}
-      />
-    )}
+    <Modal
+      visible={txModalVisible}
+      transparent
+      animationType="none"
+      onRequestClose={() => setTxModalVisible(false)}
+    >
+      {txModalVisible && (
+        <AddTransactionModal
+          symbol={symbol}
+          name={name}
+          initialPrice={nativePrice > 0 ? nativePrice.toFixed(2) : ''}
+          nativeCurrencySymbol={nativeCurrencySymbol}
+          onClose={() => setTxModalVisible(false)}
+        />
+      )}
+    </Modal>
 
     {/* Overlay — price alerts (absolute, avoids RN Modal conflicts) */}
     {alertModalVisible && (
@@ -4669,8 +4780,13 @@ export default function StockDetailScreen({ route, navigation }: Props) {
     })()}
 
     {/* Overlay — confirmar eliminação de transação */}
-    {deleteTxId !== null && (
-      <Pressable style={styles.modalOverlay} onPress={() => setDeleteTxId(null)}>
+    <Modal
+      visible={deleteTxId !== null}
+      transparent
+      animationType="none"
+      onRequestClose={() => setDeleteTxId(null)}
+    >
+      <Pressable style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 24 }]} onPress={() => setDeleteTxId(null)}>
         <Pressable style={styles.modal} onPress={() => {}}>
           <Text style={styles.modalTitle}>Delete Transaction</Text>
           <Text style={{ color: '#94a3b8', fontSize: 14, textAlign: 'center', marginBottom: 24 }}>
@@ -4689,11 +4805,16 @@ export default function StockDetailScreen({ route, navigation }: Props) {
           </View>
         </Pressable>
       </Pressable>
-    )}
+    </Modal>
 
-    {/* Overlay — editar transação (absolute, avoids RN Modal conflicts) */}
-    {editTx !== null && (
-      <Pressable style={styles.modalOverlay} onPress={() => setEditTx(null)}>
+    {/* Overlay — editar transação */}
+    <Modal
+      visible={editTx !== null}
+      transparent
+      animationType="none"
+      onRequestClose={() => setEditTx(null)}
+    >
+      <Pressable style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 24 }]} onPress={() => setEditTx(null)}>
         <Pressable style={styles.modal} onPress={() => {}}>
           <Text style={styles.modalTitle}>Editar {editTx?.type === 'buy' ? 'Compra' : 'Venda'}</Text>
           <TextInput
@@ -4738,7 +4859,7 @@ export default function StockDetailScreen({ route, navigation }: Props) {
           </View>
         </Pressable>
       </Pressable>
-    )}
+    </Modal>
     </View>
   );
 }
@@ -4862,7 +4983,7 @@ const styles = StyleSheet.create({
   txActionDelete: { width: 72, gap: 4, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ef4444', alignSelf: 'stretch' },
   txActionTxt: { color: '#fff', fontSize: 11, fontWeight: '600', textAlign: 'center' },
   modalOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 24, zIndex: 100 },
-  modal: { backgroundColor: '#1b2023', borderRadius: 16, padding: 24, borderWidth: 1, borderColor: '#303841' },
+  modal: { backgroundColor: '#1b2023', borderRadius: 16, padding: 24, borderWidth: 1, borderColor: '#303841', maxWidth: 480, width: '100%', alignSelf: 'center' },
   modalTitle: { color: '#f8fafc', fontSize: 17, fontWeight: '700', marginBottom: 16 },
   modalInput: { backgroundColor: '#171c1f', color: '#f8fafc', borderRadius: 8, padding: 12, marginBottom: 12, fontSize: 15, borderWidth: 1, borderColor: '#2a3036' },
   modalButtons: { flexDirection: 'row', gap: 10, marginTop: 4 },

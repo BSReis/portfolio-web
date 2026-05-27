@@ -24,6 +24,7 @@ import {
   Image,
   TextInput,
   Alert,
+  Platform,
 } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -106,6 +107,17 @@ const WIDE_PARAMS: Record<Period, { range: string; interval: string }> = {
   Max: { range: "max", interval: "1mo" },
 };
 
+// Mesma resolução do gráfico de velas
+const CANDLE_PARAMS: Record<Period, { range: string; interval: string }> = {
+  "1D": { range: "5d",  interval: "1m"  },
+  "1W": { range: "1mo", interval: "5m"  },
+  "1M": { range: "1mo", interval: "30m" },
+  YTD:  { range: "2y",  interval: "1d"  },
+  "1Y": { range: "2y",  interval: "1d"  },
+  "5Y": { range: "5y",  interval: "1wk" },
+  Max:  { range: "max", interval: "1wk" },
+};
+
 export default function PortfolioScreen({ scrollEnabled = true }: { scrollEnabled?: boolean }) {
   const insets = useSafeAreaInsets();
   const navigation =
@@ -161,6 +173,11 @@ export default function PortfolioScreen({ scrollEnabled = true }: { scrollEnable
   const [holdingMenuSymbol, setHoldingMenuSymbol] = useState<string | null>(
     null,
   );
+  const [kebabPopoverPos, setKebabPopoverPos] = useState<{ top: number; right: number } | null>(null);
+  const [desktopDialog, setDesktopDialog] = useState<'viewTx' | 'confirmDelete' | null>(null);
+  const closeKebab = () => { setHoldingMenuSymbol(null); setKebabPopoverPos(null); };
+  const closeKebabOpenDialog = (d: 'viewTx' | 'confirmDelete') => { setKebabPopoverPos(null); setDesktopDialog(d); };
+  const closeDialog = () => { setDesktopDialog(null); setHoldingMenuSymbol(null); };
   const [txSymbol, setTxSymbol] = useState<string | null>(null);
   const [txInitialPrice, setTxInitialPrice] = useState("");
   const [txNativeCurrencySymbol, setTxNativeCurrencySymbol] = useState<
@@ -441,7 +458,7 @@ export default function PortfolioScreen({ scrollEnabled = true }: { scrollEnable
       ).getTime() / 1000,
     );
 
-    const { range, interval } = showCustomRange ? { range: 'max', interval: '1d' } : WIDE_PARAMS[selectedPeriod];
+    const { range, interval } = showCustomRange ? { range: 'max', interval: '1d' } : CANDLE_PARAMS[selectedPeriod];
 
     Promise.all([
       Promise.all(
@@ -871,6 +888,125 @@ export default function PortfolioScreen({ scrollEnabled = true }: { scrollEnable
         </View>
       </View>
     );
+    if (isDesktop) {
+      const kebabBtn = (
+        <TouchableOpacity
+          style={styles.kebabBtn}
+          onPress={(e) => {
+            const { clientX, clientY } = e.nativeEvent as any;
+            setKebabPopoverPos({
+              top: (clientY ?? 0) + 8,
+              right: window.innerWidth - (clientX ?? 0),
+            });
+            setHoldingMenuSymbol(item.symbol);
+            setSheetView('menu');
+          }}
+          hitSlop={8}
+        >
+          <Ionicons name="ellipsis-vertical" size={18} color="#64748b" />
+        </TouchableOpacity>
+      );
+      const desktopCard = (
+        <View style={[styles.holdingCard, { paddingRight: 4 }]}>
+          <View style={styles.holdingLeft}>
+            {isCash ? (
+              <View style={[styles.tickerBadge, { backgroundColor: '#166534' }]}>
+                <Text style={styles.tickerText}>💵</Text>
+              </View>
+            ) : !logoErrors[item.symbol] ? (
+              <Image
+                source={{ uri: logos[item.symbol] ?? `https://images.financialmodelingprep.com/symbol/${item.symbol}.png` }}
+                style={styles.logoImg}
+                resizeMode="contain"
+                onError={() => setLogoErrors(prev => ({ ...prev, [item.symbol]: true }))}
+              />
+            ) : (
+              <View style={styles.tickerBadge}>
+                <Text style={styles.tickerText}>{item.symbol.slice(0, 2)}</Text>
+              </View>
+            )}
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={[styles.holdingSymbol, { flexShrink: 1 }]} numberOfLines={1}>{item.name || item.symbol}</Text>
+                {!isCash && marketBadge && (
+                  <View style={[styles.marketBadge, marketBadgeStyle]}>
+                    <Text style={[styles.marketBadgeTxt, { color: marketBadgeTxtColor }]}>{marketBadge}</Text>
+                  </View>
+                )}
+              </View>
+              {!isCash && (
+                <BlurValue hidden={hideValues} style={{ alignSelf: 'flex-start' }}>
+                  <Text style={styles.holdingDate}>
+                    {item.shares % 1 === 0
+                      ? item.shares.toFixed(0)
+                      : item.shares.toFixed(4).replace(/\.?0+$/, '')}{" "}
+                    x {fmtMoney(item.avgPrice)}{" "}
+                    {item.currency && item.currency !== currency
+                      ? item.currency
+                      : currencySymbol}
+                  </Text>
+                </BlurValue>
+              )}
+            </View>
+          </View>
+          <View style={[styles.holdingRight, { flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
+            <View style={{ alignItems: 'flex-end' }}>
+              <BlurValue hidden={hideValues}>
+                <Text style={styles.holdingValue}>
+                  {fmtMoney(value)} {currencySymbol}
+                </Text>
+              </BlurValue>
+              {!isCash && (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <BlurValue hidden={hideValues} tint={pos ? 'green' : 'red'}>
+                    <Text style={[styles.holdingGain, { color: pos ? '#22c55e' : '#ef4444' }]}>
+                      {pos ? '+' : ''}{fmtMoney(gain)} {currencySymbol}
+                    </Text>
+                  </BlurValue>
+                  <Text style={[styles.holdingGain, { color: pos ? '#22c55e' : '#ef4444' }]}>
+                    {' '}({pos ? '+' : ''}{gainPct.toFixed(2)}%)
+                  </Text>
+                </View>
+              )}
+              {!isCash && isExtended && extP != null && extChange != null && extPct != null && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                  <Ionicons name={isPreMarket ? 'sunny-outline' : 'moon-outline'} size={10} color="#94a3b8" />
+                  <Text style={{ fontSize: 11, color: '#94a3b8' }}>{isPreMarket ? 'Pre' : 'After'}</Text>
+                  <Text style={{ fontSize: 11, color: '#94a3b8' }}>{fmtMoney(extP)} {item.currency === 'EUR' ? '€' : '$'}</Text>
+                  <BlurValue hidden={hideValues} tint={extPos ? 'green' : 'red'}>
+                    <Text style={{ fontSize: 11, color: extPos ? '#22c55e' : '#ef4444' }}>
+                      {extPos ? '+' : ''}{fmtMoney(extChange * rate * item.shares)} {currencySymbol}
+                    </Text>
+                  </BlurValue>
+                  <Text style={{ fontSize: 11, color: extPos ? '#22c55e' : '#ef4444' }}>
+                    {' '}({extPos ? '+' : ''}{extPct.toFixed(2)}%)
+                  </Text>
+                </View>
+              )}
+            </View>
+            {kebabBtn}
+          </View>
+        </View>
+      );
+      return isCash ? (
+        <View>{desktopCard}</View>
+      ) : (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() =>
+            navigation.navigate('StockDetail', {
+              symbol: item.symbol,
+              name: item.name,
+              shares: item.shares,
+              avgPrice: item.avgPrice,
+            })
+          }
+        >
+          {desktopCard}
+        </TouchableOpacity>
+      );
+    }
+
     return (
       <Swipeable
         renderRightActions={(progress) =>
@@ -1250,7 +1386,7 @@ export default function PortfolioScreen({ scrollEnabled = true }: { scrollEnable
 
       {holdings.length === 0 && (
         <Text style={styles.empty}>
-          You do not own any stocks yet.{"\n"}Add them from the "Search" tab.
+          You do not own any stocks yet.{"\n"}Add them from the &quot;Search&quot; tab.
         </Text>
       )}
     </View>
@@ -1292,13 +1428,187 @@ export default function PortfolioScreen({ scrollEnabled = true }: { scrollEnable
         }
       />
 
-      {/* Overlay de opções do holding — bottom sheet manual */}
-      {holdingMenuSymbol !== null && (
+      {/* Desktop: popover kebab menu via Modal */}
+      <Modal
+        visible={isDesktop && holdingMenuSymbol !== null && kebabPopoverPos !== null}
+        transparent
+        animationType="none"
+        onRequestClose={() => { setHoldingMenuSymbol(null); setKebabPopoverPos(null); }}
+      >
+        <Pressable
+          style={StyleSheet.absoluteFillObject}
+          onPress={() => { setHoldingMenuSymbol(null); setKebabPopoverPos(null); }}
+        >
+          <Pressable
+            style={{
+              position: 'absolute',
+              top: kebabPopoverPos?.top ?? 0,
+              right: kebabPopoverPos?.right ?? 0,
+              backgroundColor: '#1e293b',
+              borderRadius: 12,
+              paddingVertical: 6,
+              minWidth: 200,
+              shadowColor: '#000',
+              shadowOpacity: 0.5,
+              shadowRadius: 20,
+              shadowOffset: { width: 0, height: 6 },
+            }}
+            onPress={() => {}}
+          >
+            {sheetView === 'menu' && (
+              <>
+                <TouchableOpacity
+                  style={styles.popoverItem}
+                  onPress={() => {
+                    if (isCombinedPortfolio) {
+                      closeKebab();
+                      Alert.alert('Read-only', 'Select a specific portfolio before adding transactions.');
+                      return;
+                    }
+                    const sym = holdingMenuSymbol;
+                    closeKebab();
+                    setTimeout(() => {
+                      if (sym) {
+                        const holding = holdings.find((h) => h.symbol === sym);
+                        setTxInitialPrice(
+                          holding && quotes[sym]?.c != null
+                            ? quotes[sym]!.c.toFixed(2)
+                            : holding ? holding.avgPrice.toFixed(2) : ''
+                        );
+                        const nc = holding?.currency ?? 'USD';
+                        setTxNativeCurrencySymbol(nc === 'EUR' ? '€' : nc === 'GBP' ? '£' : nc === 'USD' ? '$' : nc);
+                        setTabBarHidden(true);
+                        setTxSymbol(sym);
+                      }
+                    }, 50);
+                  }}
+                >
+                  <Ionicons name="add-circle-outline" size={16} color="#94a3b8" style={{ marginRight: 10 }} />
+                  <Text style={styles.popoverItemText}>Add transaction</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.popoverItem}
+                  onPress={() => { closeKebabOpenDialog('viewTx'); }}
+                >
+                  <Ionicons name="list-outline" size={16} color="#94a3b8" style={{ marginRight: 10 }} />
+                  <Text style={styles.popoverItemText}>View transactions</Text>
+                </TouchableOpacity>
+                <View style={{ height: 1, backgroundColor: '#334155', marginVertical: 4 }} />
+                <TouchableOpacity
+                  style={styles.popoverItem}
+                  onPress={() => {
+                    if (isCombinedPortfolio) {
+                      closeKebab();
+                      Alert.alert('Read-only', 'Select a specific portfolio before deleting positions.');
+                      return;
+                    }
+                    closeKebabOpenDialog('confirmDelete');
+                  }}
+                >
+                  <Ionicons name="trash-outline" size={16} color="#ef4444" style={{ marginRight: 10 }} />
+                  <Text style={[styles.popoverItemText, { color: '#ef4444' }]}>Delete position</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Desktop: centred dialog for viewTx / confirmDelete */}
+      <Modal
+        visible={isDesktop && desktopDialog !== null}
+        transparent
+        animationType="none"
+        onRequestClose={() => closeDialog()}
+      >
+        <Pressable
+          style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' }]}
+          onPress={() => closeDialog()}
+        >
+          <Pressable
+            style={{ backgroundColor: '#1e293b', borderRadius: 16, padding: 24, width: 420, maxWidth: '90%', maxHeight: '80%' }}
+            onPress={() => {}}
+          >
+            {desktopDialog === 'confirmDelete' && holdingMenuSymbol && (
+              <>
+                <Text style={{ color: '#f1f5f9', fontWeight: '700', fontSize: 16, marginBottom: 8 }}>
+                  Remove {holdingMenuSymbol}?
+                </Text>
+                <Text style={{ color: '#94a3b8', fontSize: 14, marginBottom: 24, lineHeight: 20 }}>
+                  All positions and transactions will be permanently lost.
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <TouchableOpacity
+                    style={{ flex: 1, padding: 12, backgroundColor: '#334155', borderRadius: 10, alignItems: 'center' }}
+                    onPress={() => closeDialog()}
+                  >
+                    <Text style={{ color: '#94a3b8', fontWeight: '600', fontSize: 15 }}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{ flex: 1, padding: 12, backgroundColor: '#ef4444', borderRadius: 10, alignItems: 'center' }}
+                    onPress={() => {
+                      const sym = holdingMenuSymbol;
+                      closeDialog();
+                      if (sym) removeHolding(sym);
+                    }}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+            {desktopDialog === 'viewTx' && holdingMenuSymbol && (() => {
+              const symTxs = transactions
+                .filter((t) => t.symbol === holdingMenuSymbol)
+                .sort((a, b) => b.date.localeCompare(a.date));
+              return (
+                <>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <Text style={{ color: '#f1f5f9', fontWeight: '700', fontSize: 16 }}>
+                      Transactions · {holdingMenuSymbol}
+                    </Text>
+                    <TouchableOpacity onPress={() => closeDialog()}>
+                      <Ionicons name="close" size={20} color="#64748b" />
+                    </TouchableOpacity>
+                  </View>
+                  <ScrollView showsVerticalScrollIndicator={false}>
+                    {symTxs.length === 0 ? (
+                      <Text style={{ color: '#64748b', textAlign: 'center', paddingVertical: 24 }}>No transactions recorded.</Text>
+                    ) : symTxs.map((tx) => {
+                      const txHolding = holdings.find((h) => h.symbol === tx.symbol);
+                      const total = tx.shares * tx.price * getRateFor(txHolding?.currency ?? 'USD');
+                      const isBuy = tx.type === 'buy';
+                      return (
+                        <View key={tx.id} style={styles.txRow}>
+                          <View style={[styles.txBadge, { backgroundColor: isBuy ? '#16a34a22' : '#dc262622' }]}>
+                            <Text style={[styles.txBadgeTxt, { color: isBuy ? '#22c55e' : '#ef4444' }]}>{isBuy ? 'C' : 'V'}</Text>
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.txRowDate}>{new Date(tx.date).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' })}</Text>
+                            <Text style={styles.txRowDetail}>{tx.shares} ações · {tx.price.toFixed(2)} {currencySymbol}/ação</Text>
+                          </View>
+                          <Text style={[styles.txRowTotal, { color: isBuy ? '#22c55e' : '#ef4444' }]}>
+                            {isBuy ? '+' : '-'}{total.toFixed(2)} {currencySymbol}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </ScrollView>
+                </>
+              );
+            })()}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Mobile: bottom sheet */}
+      {!isDesktop && holdingMenuSymbol !== null && (
         <Pressable
           style={styles.modalOverlay}
           onPress={() => dismissSheet()}
         >
-          <Pressable style={styles.modalSheet} onPress={() => {}}>
+          <Pressable style={styles.modalSheet} onPress={() => {}}
+          >
             {/* Zona de drag */}
             <View style={styles.modalDragZone}>
               <View style={styles.modalHandle} />
@@ -1708,17 +2018,24 @@ export default function PortfolioScreen({ scrollEnabled = true }: { scrollEnable
       </Modal>
 
       {/* Modal de adicionar transação */}
-      {txSymbol !== null && (
-        <AddTransactionModal
-          symbol={txSymbol}
-          initialPrice={txInitialPrice}
-          nativeCurrencySymbol={txNativeCurrencySymbol}
-          onClose={() => {
-            setTabBarHidden(false);
-            setTxSymbol(null);
-          }}
-        />
-      )}
+      <Modal
+        visible={txSymbol !== null}
+        transparent
+        animationType="none"
+        onRequestClose={() => { setTabBarHidden(false); setTxSymbol(null); }}
+      >
+        {txSymbol !== null && (
+          <AddTransactionModal
+            symbol={txSymbol}
+            initialPrice={txInitialPrice}
+            nativeCurrencySymbol={txNativeCurrencySymbol}
+            onClose={() => {
+              setTabBarHidden(false);
+              setTxSymbol(null);
+            }}
+          />
+        )}
+      </Modal>
     </>
   );
 }
@@ -1850,6 +2167,22 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     fontSize: 18,
     letterSpacing: 2,
+  },
+  kebabBtn: {
+    padding: 6,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  popoverItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+  },
+  popoverItemText: {
+    color: '#f1f5f9',
+    fontSize: 14,
   },
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,

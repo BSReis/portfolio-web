@@ -132,22 +132,32 @@ export default function PortfoliosManagerScreen() {
 
   const handleDelete = (id: string, name: string) => {
     if (portfolios.length <= 1) {
-      Alert.alert('Cannot delete', 'You must keep at least one portfolio.');
+      if (Platform.OS === 'web') {
+        window.alert('Cannot delete: You must keep at least one portfolio.');
+      } else {
+        Alert.alert('Cannot delete', 'You must keep at least one portfolio.');
+      }
       return;
     }
-    Alert.alert(
-      'Delete portfolio',
-      `Are you sure you want to delete "${name}"?\nAll positions and transactions will be lost.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete', style: 'destructive',
-          onPress: async () => {
-            await deletePortfolio(id);
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Delete "${name}"?\nAll positions and transactions will be lost.`)) {
+        deletePortfolio(id);
+      }
+    } else {
+      Alert.alert(
+        'Delete portfolio',
+        `Are you sure you want to delete "${name}"?\nAll positions and transactions will be lost.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete', style: 'destructive',
+            onPress: async () => {
+              await deletePortfolio(id);
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   const renderItem = ({ item }: { item: PortfolioSummary }) => {

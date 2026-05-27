@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator, Linking, Modal, Switch,
+  TextInput, Alert, ActivityIndicator, Linking, Modal, Switch, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -170,20 +170,26 @@ export default function SettingsScreen({ navigation }: Props) {
   };
 
   const handleClearPortfolio = () => {
-    Alert.alert(
-      'Delete portfolio',
-      'This will permanently erase all positions and transactions. This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete everything', style: 'destructive',
-          onPress: async () => {
-            await clearPortfolio();
-            Alert.alert('Done', 'Portfolio deleted.');
+    if (Platform.OS === 'web') {
+      if (window.confirm('This will permanently erase all positions and transactions. This action cannot be undone.')) {
+        clearPortfolio().then(() => window.alert('Portfolio deleted.'));
+      }
+    } else {
+      Alert.alert(
+        'Delete portfolio',
+        'This will permanently erase all positions and transactions. This action cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete everything', style: 'destructive',
+            onPress: async () => {
+              await clearPortfolio();
+              Alert.alert('Done', 'Portfolio deleted.');
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   const handleBrokerImport = async (broker: BrokerType) => {
