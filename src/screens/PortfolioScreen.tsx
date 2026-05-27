@@ -201,6 +201,7 @@ export default function PortfolioScreen({ scrollEnabled = true }: { scrollEnable
   const { width: _fwWidth } = useWindowDimensions();
   const isDesktop = _fwWidth >= 768;
   const filterBtnRef = useRef<View>(null);
+  const kebabBtnElRef = useRef<HTMLElement | null>(null);
   const [filterPopoverPos, setFilterPopoverPos] = useState<{ top?: number; bottom?: number; right: number; maxHeight: number }>({ top: 0, right: 16, maxHeight: 400 });
   const openFilter = () => {
     if (isDesktop && filterBtnRef.current) {
@@ -244,6 +245,25 @@ export default function PortfolioScreen({ scrollEnabled = true }: { scrollEnable
     document.addEventListener('scroll', reposition, { capture: true, passive: true });
     return () => document.removeEventListener('scroll', reposition, { capture: true });
   }, [filterVisible, isDesktop]);
+
+  // Reposicionar o kebab popover quando o utilizador faz scroll
+  useEffect(() => {
+    if (!kebabPopoverPos || !isDesktop) return;
+    const reposition = () => {
+      const el = kebabBtnElRef.current;
+      if (!el || typeof el.getBoundingClientRect !== 'function') return;
+      const rect = el.getBoundingClientRect();
+      if (rect.bottom < 0 || rect.top > window.innerHeight) {
+        setHoldingMenuSymbol(null);
+        setKebabPopoverPos(null);
+        return;
+      }
+      setKebabPopoverPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+    };
+    document.addEventListener('scroll', reposition, { capture: true, passive: true });
+    return () => document.removeEventListener('scroll', reposition, { capture: true });
+  }, [kebabPopoverPos, isDesktop]);
+
   type Timespan = "since_buy" | "year" | "ytd" | "month" | "week" | "daily";
   type SummaryFilter = Timespan | "five_year" | "max" | "custom";
   type SortBy = "relative" | "absolute" | "position";
@@ -893,11 +913,16 @@ export default function PortfolioScreen({ scrollEnabled = true }: { scrollEnable
         <TouchableOpacity
           style={styles.kebabBtn}
           onPress={(e) => {
-            const { clientX, clientY } = e.nativeEvent as any;
-            setKebabPopoverPos({
-              top: (clientY ?? 0) + 8,
-              right: window.innerWidth - (clientX ?? 0),
-            });
+            const nativeEl = (e.nativeEvent as any).target as HTMLElement;
+            const btn = (nativeEl?.closest?.('[role="button"]') as HTMLElement) ?? nativeEl;
+            kebabBtnElRef.current = btn ?? null;
+            if (btn && typeof btn.getBoundingClientRect === 'function') {
+              const rect = btn.getBoundingClientRect();
+              setKebabPopoverPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+            } else {
+              const { clientX, clientY } = e.nativeEvent as any;
+              setKebabPopoverPos({ top: (clientY ?? 0) + 8, right: window.innerWidth - (clientX ?? 0) });
+            }
             setHoldingMenuSymbol(item.symbol);
             setSheetView('menu');
           }}
