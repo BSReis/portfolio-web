@@ -70,7 +70,7 @@ const Tab = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 
 const BREAKPOINT = 768;
-const MAX_CONTENT_WIDTH = 1280;
+const MAX_CONTENT_WIDTH = 1600;
 const WEB_TOP_BAR_HEIGHT = 56;
 
 // ─── Inline search bar (shown inside the web top bar) ───────────────────────

@@ -525,11 +525,48 @@ export default function PortfolioScreen({ scrollEnabled = true }: { scrollEnable
           filterTs = Math.floor(new Date(d.getFullYear(), d.getMonth(), 1).getTime() / 1000);
         }
         let refTs = ref.d.timestamps.filter((ts) => ts >= filterTs);
+
+        // Yahoo Finance includes pre/post-market bars in 1h and 5m data. These cause
+        // zigzag spikes because holdings with extended-hours coverage return an after-hours
+        // price while holdings without it return their 4pm close → mixed prices create
+        // artificial portfolio value swings at every session boundary.
+        if (interval === '1h') {
+          // US regular session: 9:30am–4pm ET
+          //   EDT (UTC-4): 13:30–20:00 UTC
+          //   EST (UTC-5): 14:30–21:00 UTC
+          // Accept 13:30–20:30 UTC to cover both seasons without deep pre/post-market bars.
+          refTs = refTs.filter((ts) => {
+            const d = new Date(ts * 1000);
+            const utcMin = d.getUTCHours() * 60 + d.getUTCMinutes();
+            return utcMin >= 13 * 60 + 30 && utcMin <= 20 * 60 + 30;
+          });
+        } else if (interval === '5m') {
+          // For 5-minute bars (1D period), filter out extended-hours bars.
+          // Same UTC window as 1h: keep 13:30–20:30 UTC (regular US session).
+          refTs = refTs.filter((ts) => {
+            const d = new Date(ts * 1000);
+            const utcMin = d.getUTCHours() * 60 + d.getUTCMinutes();
+            return utcMin >= 13 * 60 + 30 && utcMin <= 20 * 60 + 30;
+          });
+        }
+
         if (refTs.length < 2) return;
 
-        // Se o primeiro timestamp disponível é posterior à data de compra mais antiga,
-        // injeta um ponto sintético no momento da compra usando o avgPrice de cada holding
-        if (refTs[0] > earliestPurchaseTs) {
+        // Inject a synthetic start point at the earliest purchase date ONLY if that
+        // date falls within the fetched data window. If the portfolio has been running
+        // for years but the current period only fetches 5 days (1D) or 1 month (1W),
+        // injecting a 2021 timestamp would produce a bogus data point — the only
+        // available bars are recent, so their prices get applied to 2021 share counts,
+        // creating wildly inflated/deflated first values.
+        const dataRangeSec = (() => {
+          if (range === 'max') return Infinity;
+          const n = parseInt(range);
+          if (range.endsWith('d')) return n * 86400;
+          if (range.endsWith('mo')) return n * 30 * 86400;
+          if (range.endsWith('y')) return n * 365 * 86400;
+          return Infinity;
+        })();
+        if (refTs[0] > earliestPurchaseTs && (refTs[0] - earliestPurchaseTs) <= dataRangeSec) {
           refTs = [earliestPurchaseTs, ...refTs];
         }
 
@@ -564,12 +601,16 @@ export default function PortfolioScreen({ scrollEnabled = true }: { scrollEnable
                 closest = i;
               }
             }
-            // If the nearest bar is >4 hours from the reference timestamp, the bar data
-            // is stale for this holding (e.g. trading halt, missing today's data).
-            // Fall back to the live quote so it stays consistent with latestPortfolioValue.
+            // If the nearest bar is >4 hours from the reference timestamp AND this is
+            // a recent bar (within last 24h), fall back to the live quote so it stays
+            // consistent with latestPortfolioValue (e.g. trading halt, missing today's data).
+            // Do NOT use live quote for historical bars — it would inject today's price
+            // into old chart points, causing random spikes in the historical chart.
             const STALE_THRESHOLD_S = 4 * 3600;
+            const nowSec = Date.now() / 1000;
+            const isRecentTs = ts > nowSec - 24 * 3600;
             const liveQ = quotes[h.symbol];
-            const barPrice = (minDiff > STALE_THRESHOLD_S && liveQ)
+            const barPrice = (isRecentTs && minDiff > STALE_THRESHOLD_S && liveQ)
               ? effectivePrice(liveQ)
               : (d.prices[closest] ?? h.avgPrice);
             return (

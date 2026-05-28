@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useLayoutEffect, useMemo } fro
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
   Dimensions, ScrollView, Animated, Linking, Image, Modal, Pressable, TextInput, Alert, RefreshControl,
-  useWindowDimensions,
+  useWindowDimensions, Platform,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import IconActionButton from '../components/IconActionButton';
@@ -171,9 +171,9 @@ import { Svg, Circle as SvgCircle, Line as SvgLine, Path as SvgPath, Text as Svg
 import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { RectButton } from 'react-native-gesture-handler';
 import {
-  getHistoricalData, getCandleData, getStockQuote, getDividends, getFundamentals, getNews, getFinnhubNews, getEarnings, getAnalystData, getInsiderTransactions, getFinancials, getEtfInfo, getPeerComparison, analyzeWithAI, analyzeNewsWithAI, analyzeFinancialsWithAI, generateScenarios, effectivePrice, fetchAVTechnicals, getRevenueEstimates, getDCF, generateWhatChanged,
+  getHistoricalData, getCandleData, getStockQuote, getDividends, getFundamentals, getNews, getFinnhubNews, getEarnings, getAnalystData, getInsiderTransactions, getFinancials, getEtfInfo, getPeerComparison, analyzeWithAI, analyzeNewsWithAI, analyzeFinancialsWithAI, generateScenarios, effectivePrice, fetchAVTechnicals, getRevenueEstimates, getDCF, generateWhatChanged, getHistoricalPE,
   HistoricalData, CandleData, StockQuote, Fundamentals, NewsItem, Dividend, EarningsEvent, FinancialPeriod,
-  AnalystConsensus, AnalystHistorical, PriceTargetConsensus, InsiderTransaction, EtfInfo, PeerComparison, AVTechnicals, RevenueEstimateYear, DCFResult, ScenarioResult, WhatChangedResult,
+  AnalystConsensus, AnalystHistorical, PriceTargetConsensus, InsiderTransaction, EtfInfo, PeerComparison, AVTechnicals, RevenueEstimateYear, DCFResult, ScenarioResult, WhatChangedResult, HistoricalPEEntry,
 } from '../services/api';
 import { calcFifo } from '../utils/format';
 import { BlurValue } from '../utils/blurValue';
@@ -383,6 +383,8 @@ export default function StockDetailScreen({ route, navigation }: Props) {
 
   const [fundamentals, setFundamentals] = useState<Fundamentals | null>(null);
   const [fundLoading, setFundLoading] = useState(false);
+  const [historicalPE, setHistoricalPE] = useState<HistoricalPEEntry[]>([]);
+  const [peContainerWidth, setPeContainerWidth] = useState(0);
   const [etfInfo, setEtfInfo] = useState<EtfInfo | null>(null);
   const [etfLoading, setEtfLoading] = useState(false);
   const [peerComparison, setPeerComparison] = useState<PeerComparison | null>(null);
@@ -560,6 +562,11 @@ export default function StockDetailScreen({ route, navigation }: Props) {
   useEffect(() => {
     setFundLoading(true);
     getFundamentals(symbol).then(setFundamentals).catch(() => {}).finally(() => setFundLoading(false));
+  }, [symbol]);
+
+  // Historical P/E (FMP key-metrics annual)
+  useEffect(() => {
+    getHistoricalPE(symbol).then(setHistoricalPE).catch(() => {});
   }, [symbol]);
 
   // Fetch ETF info once the quote loads and confirms it's an ETF
@@ -969,6 +976,108 @@ export default function StockDetailScreen({ route, navigation }: Props) {
           )}
         </View>
         <Text style={[styles.fundValue, accent ? styles.fundValueAccent : null]}>{value}</Text>
+      </View>
+    );
+  };
+
+  const renderPEChart = () => {
+    if (historicalPE.length < 2) return null;
+    // For the most recent bar, recalculate P/E using the live price so it
+    // reflects current valuation instead of the fiscal-year-end price.
+    const basePE = historicalPE.map((e, i) => {
+      if (i < historicalPE.length - 1) return e;
+      const liveEPS = e.eps;
+      if (nativePrice > 0 && liveEPS > 0) {
+        const livePE = nativePrice / liveEPS;
+        if (livePE > 0 && livePE < 1000) return { ...e, peRatio: livePE };
+      }
+      return e;
+    });
+    // Fill year gaps with placeholder entries so the timeline is continuous
+    const displayPE: Array<{ year: number; peRatio: number; eps: number; date: string; isGap: boolean }> = [];
+    for (let i = 0; i < basePE.length; i++) {
+      if (i > 0) {
+        for (let y = basePE[i - 1].year + 1; y < basePE[i].year; y++) {
+          displayPE.push({ year: y, peRatio: 0, eps: 0, date: '', isGap: true });
+        }
+      }
+      displayPE.push({ ...basePE[i], isGap: false });
+    }
+    const chartW = peContainerWidth > 0 ? peContainerWidth - 32 : (isDesktop ? Math.min(windowWidth - 240, 780) : windowWidth - 48);
+    const CH = isDesktop ? 148 : 110;
+    const PL = isDesktop ? 36 : 28;
+    const PR = isDesktop ? 6 : 4;
+    const PT = isDesktop ? 30 : 20;
+    const PB = isDesktop ? 28 : 22;
+    const fSz = isDesktop ? 10 : 7;
+    const fSzAxis = isDesktop ? 9 : 7;
+    const vals = displayPE.filter(e => !e.isGap).map(e => e.peRatio);
+    const maxV = Math.max(...vals) * 1.1;
+    const avgV = vals.reduce((s, v) => s + v, 0) / vals.length;
+    const n = displayPE.length;
+    const STEP = (chartW - PL - PR) / n;
+    const BW = Math.max(STEP * 0.45, 5);
+    const sy = (v: number) => PT + (1 - v / maxV) * (CH - PT - PB);
+    return (
+      <View style={{ borderTopWidth: 1, borderTopColor: '#1e293b', paddingTop: 10, marginTop: 2 }}>
+        <Text style={{ color: '#94a3b8', fontSize: isDesktop ? 13 : 11, fontWeight: '600', textAlign: 'center', marginBottom: 4 }}>
+          Historical P/E (Annual)
+        </Text>
+        <Svg width={chartW} height={CH} style={{ alignSelf: 'center' }}>
+          {[0.33, 0.67, 1].map(frac => {
+            const v = maxV * (1 - frac);
+            const yPos = PT + frac * (CH - PT - PB);
+            return (
+              <React.Fragment key={frac}>
+                <SvgLine x1={PL} y1={yPos} x2={chartW - PR} y2={yPos} stroke="#1e293b" strokeWidth={1} />
+                <SvgText x={PL - 3} y={yPos + 3} fontSize={fSzAxis} fill="#475569" textAnchor="end">
+                  {v.toFixed(0)}×
+                </SvgText>
+              </React.Fragment>
+            );
+          })}
+          <SvgLine x1={PL} y1={sy(avgV)} x2={chartW - PR} y2={sy(avgV)} stroke="#f59e0b" strokeWidth={1} strokeDasharray="4,3" />
+          {displayPE.map((e, i) => {
+            const isLast = i === n - 1;
+            const cx = PL + i * STEP + STEP / 2;
+            if (e.isGap) {
+              return (
+                <React.Fragment key={`gap-${e.year}`}>
+                  {cx > PL + fSzAxis && (
+                    <SvgText x={cx} y={CH - PB + (isDesktop ? 16 : 13)} fontSize={fSzAxis} fill="#2d3a4a" textAnchor="middle">
+                      {String(e.year).slice(2)}
+                    </SvgText>
+                  )}
+                </React.Fragment>
+              );
+            }
+            const barY = sy(e.peRatio);
+            const barH = Math.max(CH - PB - barY, 2);
+            return (
+              <React.Fragment key={e.year}>
+                <SvgRect x={cx - BW / 2} y={barY} width={BW} height={barH} fill={isLast ? '#818cf8' : '#334155'} rx={2} />
+                <SvgText x={cx} y={Math.max(barY - 3, fSz + 2)} fontSize={fSz} fill={isLast ? '#c7d2fe' : '#64748b'} textAnchor="middle">
+                  {e.peRatio.toFixed(0)}×
+                </SvgText>
+                {cx > PL + fSzAxis && (
+                  <SvgText x={cx} y={CH - PB + (isDesktop ? 16 : 13)} fontSize={fSzAxis} fill="#475569" textAnchor="middle">
+                    {String(e.year).slice(2)}
+                  </SvgText>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </Svg>
+        <View style={{ flexDirection: 'row', gap: 12, justifyContent: 'center', marginTop: 4 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View style={{ width: 14, height: 1, borderStyle: 'dashed', borderWidth: 1, borderColor: '#f59e0b' }} />
+            <Text style={{ color: '#94a3b8', fontSize: isDesktop ? 11 : 9 }}>Avg. {avgV.toFixed(1)}×</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View style={{ width: 8, height: 8, backgroundColor: '#818cf8', borderRadius: 1 }} />
+            <Text style={{ color: '#94a3b8', fontSize: isDesktop ? 11 : 9 }}>Current</Text>
+          </View>
+        </View>
       </View>
     );
   };
@@ -2556,6 +2665,16 @@ export default function StockDetailScreen({ route, navigation }: Props) {
           </>
         )}
 
+        {/* Historical P/E — full width before Peers */}
+        {historicalPE.length >= 2 && (
+          <View
+            style={[styles.fundCard, { marginTop: 20 }]}
+            onLayout={(e) => setPeContainerWidth(e.nativeEvent.layout.width)}
+          >
+            {renderPEChart()}
+          </View>
+        )}
+
         {/* Peer Comparison */}
         {peerLoading && !peerComparison && (
           <ActivityIndicator color="#6366f1" style={{ marginTop: 16 }} />
@@ -4084,10 +4203,10 @@ export default function StockDetailScreen({ route, navigation }: Props) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, Platform.OS === 'web' && { position: 'fixed' as any, top: 56, left: 0, right: 0, bottom: 0 }]}>
     <ScrollView
       style={{ flex: 1 }}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, Platform.OS === 'web' && { maxWidth: 1600, alignSelf: 'center' as any, width: '100%' }]}
       scrollEnabled={true}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366f1" colors={['#6366f1']} />
@@ -4184,8 +4303,8 @@ export default function StockDetailScreen({ route, navigation }: Props) {
               </TouchableOpacity>
             )}
             <Text style={styles.priceText}>
-              {(candleCrosshair.visible ? candleCrosshair.price : nativePrice).toFixed(2)} {nativeCurrencySymbol}
-              {!sameAsCurrency ? <Text style={styles.priceSecondary}>{' '}/ {(candleCrosshair.visible ? candleCrosshair.price * fxRate : currentPrice).toFixed(2)} {currencySymbol}</Text> : null}
+              {Number(candleCrosshair.visible ? (candleCrosshair.price ?? 0) : (nativePrice ?? 0)).toFixed(2)} {nativeCurrencySymbol}
+              {!sameAsCurrency ? <Text style={styles.priceSecondary}>{' '}/ {(Number(candleCrosshair.visible ? (candleCrosshair.price ?? 0) : 1) * Number(fxRate || 1) || Number(currentPrice || 0)).toFixed(2)} {currencySymbol}</Text> : null}
             </Text>
           </View>
           <Text style={[styles.dailyChange, { color: periodPos ? '#22c55e' : '#ef4444' }]}>

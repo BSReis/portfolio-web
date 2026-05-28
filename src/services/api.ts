@@ -1943,6 +1943,106 @@ async function _getEarnings(symbol: string, period: 'quarter' | 'annual' = 'quar
   return [...upcomingFiltered, ...past];
 };
 
+// ── Historical P/E ────────────────────────────────────────────────────────────
+export interface HistoricalPEEntry {
+  date: string;   // YYYY-MM-DD (fiscal year end)
+  year: number;
+  peRatio: number;
+  eps: number;    // annual EPS used for this bar
+}
+
+export const getHistoricalPE = async (symbol: string): Promise<HistoricalPEEntry[]> => {
+  const key = `${symbol}:historicalPE:v6`;
+  const mem = cacheGet<HistoricalPEEntry[]>(key);
+  if (mem !== undefined) return mem;
+  const persisted = await persistGet<HistoricalPEEntry[]>(key);
+  if (persisted !== undefined) { cacheSet(key, persisted, TTL.financials); return persisted; }
+  try {
+    // Alpha Vantage annual EPS + Yahoo monthly prices
+    const [avRes, chartRes] = await Promise.all([
+      av.get('/query', { params: { function: 'EARNINGS', symbol, apikey: AV_KEY } }).catch(() => null),
+      yahoo1.get(`/v8/finance/chart/${symbol}`, { params: { range: '15y', interval: '1mo' } }).catch(() => null),
+    ]);
+    const annualEPS: Array<{ fiscalDateEnding: string; reportedEPS: string }> =
+      Array.isArray(avRes?.data?.annualEarnings) ? avRes.data.annualEarnings : [];
+    const chartResult = chartRes?.data?.chart?.result?.[0];
+    const timestamps: number[] = chartResult?.timestamp ?? [];
+    const closes: number[] = chartResult?.indicators?.adjclose?.[0]?.adjclose ?? [];
+
+    // Build month → price map ('YYYY-MM' → close) — needed by both AV and Yahoo fallback
+    const priceMap = new Map<string, number>();
+    timestamps.forEach((ts, i) => {
+      const d = new Date(ts * 1000);
+      const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (closes[i] != null && closes[i] > 0) priceMap.set(mk, closes[i]);
+    });
+
+    // Helper: find price within ±3 months of a fiscal date
+    const findPrice = (fiscalDate: string): number | undefined => {
+      const d = new Date(fiscalDate);
+      for (let offset = 0; offset <= 3; offset++) {
+        for (const sign of [0, -1, 1]) {
+          const m = new Date(d);
+          m.setMonth(m.getMonth() + sign * offset);
+          const mk = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}`;
+          const p = priceMap.get(mk);
+          if (p && p > 0) return p;
+        }
+      }
+      return undefined;
+    };
+
+    let epsSource: Array<{ fiscalDateEnding: string; reportedEPS: string }> = annualEPS;
+
+    // If AV is rate-limited or returned nothing, fall back to SEC EDGAR (free, no auth needed server-side)
+    if (annualEPS.length === 0 && priceMap.size > 0) {
+      const secRes = await axios.get(`/api/sec-eps/${symbol}`).catch(() => null);
+      const secEntries: Array<{ end: string; val: number }> = Array.isArray(secRes?.data) ? secRes.data : [];
+      epsSource = secEntries
+        .filter(e => e.val > 0)
+        .map(e => ({ fiscalDateEnding: e.end, reportedEPS: String(e.val) }));
+    }
+
+    if (epsSource.length === 0 || priceMap.size === 0) return [];
+    // Normalise to descending order (newest first) — the stub filter below requires this
+    epsSource = [...epsSource].sort(
+      (a, b) => new Date(b.fiscalDateEnding).getTime() - new Date(a.fiscalDateEnding).getTime()
+    );
+    // Filter out stub/partial fiscal periods: AV sometimes includes the most recent
+    // reported quarter as an "annual" entry (e.g. Q1-only with 3 months of EPS).
+    // If the gap between consecutive entries is < 11 months, skip the newer one.
+    const MIN_PERIOD_MS = 330 * 24 * 3600 * 1000;
+    const fullYearEPS = epsSource.filter((e, i) => {
+      if (i === epsSource.length - 1) return true;
+      const curr = new Date(e.fiscalDateEnding).getTime();
+      const older = new Date(epsSource[i + 1].fiscalDateEnding).getTime();
+      return curr - older >= MIN_PERIOD_MS;
+    });
+    const seenYears = new Set<number>();
+    const result: HistoricalPEEntry[] = [];
+    for (const e of fullYearEPS) {
+      const eps = parseFloat(e.reportedEPS);
+      if (!eps || eps <= 0 || !e.fiscalDateEnding) continue;
+      const year = new Date(e.fiscalDateEnding).getFullYear();
+      if (seenYears.has(year)) continue;
+      const price = findPrice(e.fiscalDateEnding);
+      if (!price || price <= 0) continue;
+      const peRatio = price / eps;
+      if (peRatio <= 0 || peRatio >= 1000) continue;
+      seenYears.add(year);
+      result.push({ date: e.fiscalDateEnding, year, peRatio, eps });
+    }
+    const sorted = result.sort((a, b) => a.year - b.year).slice(-12);
+    if (sorted.length >= 2) {
+      cacheSet(key, sorted, TTL.financials);
+      persistSet(key, sorted, TTL.financials);
+    }
+    return sorted;
+  } catch {
+    return [];
+  }
+};
+
 // ── Financial Statements ───────────────────────────────────────────────────────
 export interface FinancialPeriod {
   label: string;
