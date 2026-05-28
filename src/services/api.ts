@@ -1195,16 +1195,20 @@ const fmpHasData = (data: unknown): boolean =>
 
 export const getFundamentals = async (symbol: string): Promise<Fundamentals | null> => {
   const key = `${symbol}:fundamentals:v4`;
-  // 1. in-memory
+  // 1. in-memory (only return cached value if it's actual data, not a cached failure)
   const mem = cacheGet<Fundamentals | null>(key);
-  if (mem !== undefined) return mem;
-  // 2. persistent (AsyncStorage)
+  if (mem !== undefined && mem !== null) return mem;
+  // 2. persistent — skip cached nulls so transient API failures are retried on next load
   const persisted = await persistGet<Fundamentals | null>(key);
-  if (persisted !== undefined) { cacheSet(key, persisted, TTL.fundamentals); return persisted; }
+  if (persisted !== undefined && persisted !== null) { cacheSet(key, persisted, TTL.fundamentals); return persisted; }
   // 3. fetch
   const result = await _getFundamentals(symbol);
-  cacheSet(key, result, TTL.fundamentals);
-  persistSet(key, result, TTL.fundamentals);
+  // Only cache successful results — don't persist nulls (transient failures would block
+  // retries for 24h, leaving the overview permanently empty until cache expires).
+  if (result !== null) {
+    cacheSet(key, result, TTL.fundamentals);
+    persistSet(key, result, TTL.fundamentals);
+  }
   return result;
 };
 

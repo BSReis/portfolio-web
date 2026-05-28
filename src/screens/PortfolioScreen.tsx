@@ -681,27 +681,59 @@ export default function PortfolioScreen({ scrollEnabled = true }: { scrollEnable
             })
             .sort((a, b) => a.ts - b.ts);
 
-          const benchmarkValues = refTs.map((ts) => {
-            let units = 0;
+          // Period-relative benchmark — avoids spike amplification.
+          //
+          // The old cash-flow formula (from inception) was rescaled by the
+          // InteractiveChart normalisation factor  portStart / rawBenchmark_periodStart.
+          // When the portfolio has historically outperformed SPY this factor can be
+          // 5–10×, turning a normal transaction step into a massive visual spike
+          // (the step gets amplified on entry, then the crash brings it back down).
+          //
+          // New formula — benchmark is computed over combinedTimestamps so its length
+          // matches fullData.prices exactly and no extra slice/push is needed:
+          //
+          //   B(t) = portStart × (SPY_t / SPY_periodStart)           // history in SPY
+          //        + Σ_{periodStart < f.ts ≤ t} f.amount × (SPY_t / SPY_f.ts)  // new buys
+          //
+          // At period start B = portStart, so InteractiveChart normalisation = 1 (no-op).
+          const nowTs = Date.now() / 1000;
+          const periodCutoffMap: Record<string, number> = {
+            '1D':  nowTs - 86400,
+            '1W':  nowTs - 7 * 86400,
+            '1M':  nowTs - 30 * 86400,
+            'YTD': new Date(new Date().getFullYear(), 0, 1).getTime() / 1000,
+            '1Y':  nowTs - 365 * 86400,
+            '5Y':  nowTs - 5 * 365 * 86400,
+            'Max': 0,
+          };
+          const pCutoff  = showCustomRange ? 0 : (periodCutoffMap[selectedPeriod] ?? 0);
+          const pStartIdx = pCutoff === 0
+            ? 0
+            : Math.max(0, combinedTimestamps.findIndex(t => t >= pCutoff));
+          const pStartTs  = combinedTimestamps[pStartIdx] ?? 0;
+          const pStartVal = combinedPrices[pStartIdx] ?? 0;
+          const spyAtPStart = spyPriceAt(pStartTs);
+
+          const benchmarkOverlay = combinedTimestamps.map((ts) => {
+            const spyCur = spyPriceAt(ts);
+            if (spyCur <= 0 || spyAtPStart <= 0 || pStartVal <= 0) return pStartVal;
+            // Base: treat the period-start portfolio value as a lump-sum in SPY
+            const base = pStartVal * (spyCur / spyAtPStart);
+            // New cash flows AFTER period start (face-value — no ratio amplification)
+            let extra = 0;
             for (const flow of benchmarkFlows) {
+              if (flow.ts <= pStartTs) continue;
               if (flow.ts > ts) break;
-              const flowSpyPrice = spyPriceAt(flow.ts);
-              if (flowSpyPrice <= 0) continue;
-              units += flow.amount / flowSpyPrice;
+              const fSpy = spyPriceAt(flow.ts);
+              if (fSpy <= 0) continue;
+              extra += flow.amount * (spyCur / fSpy);
             }
-            const currentSpyPrice = spyPriceAt(ts);
-            return currentSpyPrice > 0 ? units * currentSpyPrice : 0;
+            return base + extra;
           });
 
-          const alignedBenchmarkValues = benchmarkValues.slice(firstValid);
-          if (alignedBenchmarkValues.length > 0) {
-            const lastTs = combinedTimestamps[combinedTimestamps.length - 1] ?? 0;
-            const benchmarkLastTs = refTs[refTs.length - 1] ?? 0;
-            if (lastTs > benchmarkLastTs) {
-              alignedBenchmarkValues.push(alignedBenchmarkValues[alignedBenchmarkValues.length - 1]);
-            }
+          if (benchmarkOverlay.length > 0) {
+            setSpxOverlay(benchmarkOverlay);
           }
-          setSpxOverlay(alignedBenchmarkValues);
         } else {
           setSpxOverlay([]);
         }

@@ -115,16 +115,33 @@ export default function InteractiveChart({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startIdx, clamped]);
 
-  // ---- Price range (memoized) ----
+  // ---- Overlay prices (computed before price range so it can be included in Y-axis) ----
+  // Normalise to the first point of the VISIBLE window so both lines start at the same
+  // Y position for the selected period. This gives a correct "relative performance in
+  // this period" view (e.g. YTD: both start at 0%, diverge from there).
+  const visibleOverlayPrices = useMemo(() => {
+    if (!overlayPrices || overlayPrices.length !== prices.length || prices.length === 0) return [];
+    const raw = overlayPrices.slice(startIdx, startIdx + clamped);
+    if (raw.length < 2 || visiblePrices.length < 2) return raw;
+    const ovStart = raw[0], portStart = visiblePrices[0];
+    if (!ovStart || !portStart) return raw;
+    return raw.map((v) => (v / ovStart) * portStart);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startIdx, clamped, overlayPrices]);
+
+  // ---- Price range — includes overlay so the S&P line is never clipped ----
   const [priceMin, priceMax] = useMemo(() => {
-    if (visiblePrices.length === 0) return [0, 1];
-    let mn = visiblePrices[0], mx = visiblePrices[0];
-    for (let i = 1; i < visiblePrices.length; i++) {
-      if (visiblePrices[i] < mn) mn = visiblePrices[i];
-      if (visiblePrices[i] > mx) mx = visiblePrices[i];
+    const combined = visibleOverlayPrices.length > 0
+      ? [...visiblePrices, ...visibleOverlayPrices]
+      : visiblePrices;
+    if (combined.length === 0) return [0, 1];
+    let mn = combined[0], mx = combined[0];
+    for (let i = 1; i < combined.length; i++) {
+      if (combined[i] < mn) mn = combined[i];
+      if (combined[i] > mx) mx = combined[i];
     }
     return [mn, mx];
-  }, [visiblePrices]);
+  }, [visiblePrices, visibleOverlayPrices]);
   const priceRange = priceMax - priceMin || 1;
 
   // ---- Coordinate helpers ----
@@ -163,17 +180,6 @@ export default function InteractiveChart({
     path.close();
     return path;
   }, [visiblePrices, toX, toY, CHART_H]);
-
-  // Overlay path
-  const visibleOverlayPrices = useMemo(() => {
-    if (!overlayPrices || overlayPrices.length !== prices.length || prices.length === 0) return [];
-    const raw = overlayPrices.slice(startIdx, startIdx + clamped);
-    if (raw.length < 2 || visiblePrices.length < 2) return raw;
-    const ovStart = raw[0], portStart = visiblePrices[0];
-    if (!ovStart || !portStart) return raw;
-    return raw.map((v) => (v / ovStart) * portStart);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startIdx, clamped, overlayPrices]);
 
   const overlayPath = useMemo(() => {
     if (visibleOverlayPrices.length < 2) return null;
