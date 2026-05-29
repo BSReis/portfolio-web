@@ -9,6 +9,7 @@ import { RootStackParamList } from '../../App';
 import { useSettings, Currency } from '../context/SettingsContext';
 import { usePortfolio } from '../context/PortfolioContext';
 import { BrokerType } from '../utils/importBroker';
+import { encodePortfolioShare } from '../utils/sharePortfolio';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
@@ -32,8 +33,9 @@ export default function SettingsScreen({ navigation }: Props) {
     setDividendTaxRate,
     colorScheme,
     setColorScheme,
+    hideValues,
   } = useSettings();
-  const { exportPortfolio, importPortfolio, importBrokerCSV, clearPortfolio } = usePortfolio();
+  const { exportPortfolio, importPortfolio, importBrokerCSV, clearPortfolio, holdings, transactions, activePortfolioName } = usePortfolio();
 
   const [draftFmp, setDraftFmp] = useState(fmpKey);
   const [draftFh, setDraftFh] = useState(fhKey);
@@ -45,6 +47,7 @@ export default function SettingsScreen({ navigation }: Props) {
   const [backupBusy, setBackupBusy] = useState(false);
   const [brokerBusy, setBrokerBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [shareLinkCopied, setShareLinkCopied] = useState(false);
   const [apiInfo, setApiInfo] = useState<null | { title: string; desc: string; url: string; urlLabel: string }>(null);
 
   const API_INFO = {
@@ -116,6 +119,31 @@ export default function SettingsScreen({ navigation }: Props) {
     try { await exportPortfolio({ fmpKey, fhKey, groqKey, tavilyKey, avKey }); }
     catch { Alert.alert('Error', 'Could not export the portfolio.'); }
     finally { setBackupBusy(false); }
+  };
+
+  const handleShareLink = () => {
+    try {
+      const encoded = encodePortfolioShare(activePortfolioName, holdings, transactions, hideValues);
+      const url = `${window.location.origin}/share?d=${encoded}`;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(() => {
+          setShareLinkCopied(true);
+          setTimeout(() => setShareLinkCopied(false), 3000);
+        });
+      } else {
+        // Fallback for older browsers
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        setShareLinkCopied(true);
+        setTimeout(() => setShareLinkCopied(false), 3000);
+      }
+    } catch {
+      Alert.alert('Error', 'Could not generate share link.');
+    }
   };
 
   const handleImport = async () => {
@@ -389,6 +417,15 @@ export default function SettingsScreen({ navigation }: Props) {
           ? <><Ionicons name="checkmark" size={18} color="#fff" /><Text style={styles.saveBtnText}>  Saved</Text></>
           : <Text style={styles.saveBtnText}>Save Settings</Text>
         }
+      </TouchableOpacity>
+
+      <Text style={[styles.section, { marginTop: 28 }]}>Share portfolio</Text>
+      <Text style={styles.hint}>
+        Generate a shareable link with your current portfolio. Anyone with the link can view your holdings, chart and performance — no account needed.
+      </Text>
+      <TouchableOpacity style={[styles.backupBtn, shareLinkCopied && { backgroundColor: '#16a34a' }]} onPress={handleShareLink}>
+        <Ionicons name={shareLinkCopied ? 'checkmark-circle-outline' : 'link-outline'} size={18} color="#f8fafc" />
+        <Text style={styles.backupBtnText}>{shareLinkCopied ? 'Link copied to clipboard!' : 'Copy share link'}</Text>
       </TouchableOpacity>
 
       <Text style={[styles.section, { marginTop: 28 }]}>Portfolio backup</Text>
