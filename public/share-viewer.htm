@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex, nofollow">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-2hEKKPktvfN7OOMEUVuhG8oZDeDxsHoW47LHVZluADU='; style-src 'sha256-mTpC9qlZJ9B+FU7eA+z9vabjSYCcJT0rQBwz7mn1Rgw='; base-uri 'none'; form-action 'none'; connect-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-gwLw8sb5VIzPGgbd3I2Mri+tAb46KYJuTr+OBKAZYeM='; style-src 'sha256-1hdjlPiwVakhIl73rdMNAs1OBEiI9QaVpfbHYPG3/jM='; base-uri 'none'; form-action 'none'; connect-src 'none'">
   <title>Portfolio</title>
   <style>
     :root { color-scheme: dark; --background: #111417; --text: #f5f7fa; --muted: #9da5ad; --line: #303638; --accent: #8defc4; }
@@ -139,7 +139,7 @@
       <table aria-label="Portfolio allocation percentages">
         <thead><tr id="columns"><th scope="col">Holding</th><th scope="col">Weight</th></tr></thead>
         <tbody id="positions"></tbody>
-        <tfoot><tr><th scope="row">Total</th><td>100.00%</td></tr></tfoot>
+        <tfoot><tr id="total-row"><th scope="row">Total</th><td>100.00%</td></tr></tfoot>
       </table>
     </section>
   </main>
@@ -321,7 +321,16 @@
         const columns = document.getElementById("columns");
         columns.className = snapshot.v === 2 ? "is-report" : "";
         const headings = snapshot.v === 2 ? ["Holding", "Weight", "Position", "P/L"] : ["Holding", "Weight"];
-        columns.replaceChildren(...headings.map((label) => element("th", "", label)));
+        columns.replaceChildren(...headings.map((label) => {
+          const heading = element("th", "", label);
+          heading.scope = "col";
+          return heading;
+        }));
+        const totalRow = document.getElementById("total-row");
+        const totalValue = snapshot.positions.reduce((sum, position) => sum + (position.value ?? 0), 0);
+        totalRow.replaceChildren(element("th", "", "Total"), element("td", "", "100.00%"));
+        if (snapshot.v === 2)
+          totalRow.append(element("td", "position-value", formatCurrency(totalValue, snapshot.currency)), element("td", ""));
         document.getElementById("ring").style.setProperty("--segments", segments.join(", "));
         document.getElementById("error").hidden = true;
         document.getElementById("portfolio").hidden = false;
@@ -445,6 +454,17 @@
             rows.push(row);
           });
           document.getElementById("positions").replaceChildren(...rows);
+          const reportPeriod = snapshot.periods[selectedPositionPeriod];
+          const pnlTotal = reportPeriod.gain === null
+            ? "N/A"
+            : formatCurrency(reportPeriod.gain, snapshot.currency) +
+              (reportPeriod.gainPct === null ? "" : " " + formatPercent(reportPeriod.gainPct));
+          document.getElementById("total-row").replaceChildren(
+            element("th", "", "Total"),
+            element("td", "", "100.00%"),
+            element("td", "position-value", formatCurrency(currentValue, snapshot.currency)),
+            element("td", "gain-main", pnlTotal),
+          );
         };
         const renderChartPeriods = () => makePeriods("chart-periods", selectedChartPeriod, period => {
           selectedChartPeriod = period;
