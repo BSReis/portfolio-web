@@ -454,10 +454,12 @@
             const holding = element("div", "holding");
             const swatch = element("span", "swatch"); swatch.style.backgroundColor = palette[index % palette.length];
             const identity = element("div", "position-identity");
-            identity.append(element("div", "symbol", position.symbol), element("div", "company", position.name), element("div", "shares", formatShares(position.shares) + " shares"));
+            identity.append(element("div", "symbol", position.symbol), element("div", "company", position.name), element("div", "shares", formatShares(position.shares) + (position.symbol.startsWith("CASH_") ? " cash" : " shares")));
             holding.append(swatch, identity); heading.append(holding);
             const weight = element("td"); weight.append(element("div", "weight", position.weight.toFixed(2) + "%"));
-            const value = element("td"); value.append(element("div", "position-value", formatCurrency(position.value, snapshot.currency)));
+            const value = element("td");
+            value.append(element("div", "position-value", formatCurrency(position.value, snapshot.currency)));
+            value.append(element("div", "position-unit-price", position.shares > 0 ? formatCurrency(position.value / position.shares, snapshot.currency) : ""));
             const pnl = element("td", "pnl-cell");
             const metric = position.performance[selectedPositionPeriod];
             pnl.append(element("div", "gain-main", metric.gain === null ? "N/A" : formatCurrency(metric.gain, snapshot.currency)));
