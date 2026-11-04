@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex, nofollow">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-IiRlPVyoYrbHzhxqAMXiGYxHwMtXdTpTVvUPqc4uJsQ='; style-src 'sha256-1hdjlPiwVakhIl73rdMNAs1OBEiI9QaVpfbHYPG3/jM='; base-uri 'none'; form-action 'none'; connect-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-r+Hn6rcJYjiQdsbk2x4r6bMDBqz5iW0wGefTl2RD3i0='; style-src 'sha256-pbrUPYTfxoGoWcgLdtG6o0LemY6ZsFHillp2vk32H0o='; base-uri 'none'; form-action 'none'; connect-src 'none'">
   <title>Portfolio</title>
   <style>
     :root { color-scheme: dark; --background: #111417; --text: #f5f7fa; --muted: #9da5ad; --line: #303638; --accent: #8defc4; }
@@ -27,10 +27,11 @@
     .report-gain { display: flex; align-items: baseline; gap: 8px; font-size: 19px; font-variant-numeric: tabular-nums; }
     .report-gain strong { font-weight: 600; }
     .report-gain span, .report-value { color: var(--muted); font-size: 13px; }
-    .chart-wrap { min-height: 220px; position: relative; }
+    .chart-wrap { min-height: 220px; position: relative; margin: 0; }
     canvas { display: block; width: 100%; height: 220px; }
     .chart-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; }
-    .periods { display: flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 8px; }
+    .periods { min-width: 0; margin: 0; display: flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 8px; }
+    .period-options { width: 100%; display: flex; justify-content: space-between; gap: 4px; }
     .period-button { min-width: 46px; padding: 6px 9px; border: 0; border-radius: 5px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
     .period-button[aria-pressed="true"] { background: #303638; color: var(--text); }
     .positions-heading { align-items: center; margin: 24px 0 16px; }
@@ -68,6 +69,7 @@
     tfoot th, tfoot td { padding-top: 20px; font-weight: 500; text-align: left; font-variant-numeric: tabular-nums; }
     .error { padding: 56px 0; }
     .error p { color: var(--muted); }
+    .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
     @media (max-width: 520px) {
       main { width: calc(100% - 32px); padding-top: 24px; }
       .summary { grid-template-columns: minmax(0, 1fr) 112px; gap: 16px; padding: 28px 0; }
@@ -126,14 +128,20 @@
           </div>
           <p class="report-value" id="report-value"></p>
         </div>
-        <div class="chart-wrap">
-          <canvas id="chart" role="img" aria-label="Portfolio value over time"></canvas>
+        <figure class="chart-wrap">
+          <canvas id="chart">Portfolio value over time.</canvas>
           <p id="chart-empty" class="chart-empty" hidden>No chart data is available for this period.</p>
-        </div>
-        <div id="chart-periods" class="periods" role="group" aria-label="Growth period"></div>
+        </figure>
+        <fieldset id="chart-periods" class="periods">
+          <legend class="visually-hidden">Growth period</legend>
+          <div id="chart-period-buttons" class="period-options"></div>
+        </fieldset>
         <div class="positions-heading">
           <h2>Positions</h2>
-          <div id="position-periods" class="periods" role="group" aria-label="Position profit and loss period"></div>
+          <fieldset id="position-periods" class="periods">
+            <legend class="visually-hidden">Position profit and loss period</legend>
+            <div id="position-period-buttons" class="period-options"></div>
+          </fieldset>
         </div>
       </section>
       <table aria-label="Portfolio allocation percentages">
@@ -149,6 +157,7 @@
       const periods = ["1D", "1W", "1M", "YTD", "1Y", "5Y", "Max"];
       const palette = ["#8defc4", "#75a9ff", "#f4cb69", "#f29caf", "#bca9f0", "#61ccd4", "#b8ce76", "#e8a77e"];
       let redrawChart = () => {};
+      let chartResizeObserver = null;
       window.addEventListener("resize", () => redrawChart());
 
       function decodeCompact(encoded) {
@@ -258,6 +267,7 @@
         document.getElementById("positions").replaceChildren();
         document.getElementById("columns").className = "";
         document.getElementById("report").hidden = true;
+        if (chartResizeObserver) { chartResizeObserver.disconnect(); chartResizeObserver = null; }
         document.getElementById("ring").style.setProperty("--segments", "#303638 0% 100%");
         document.getElementById("error").hidden = false;
         document.getElementById("portfolio").hidden = true;
@@ -357,7 +367,7 @@
           button.addEventListener("click", () => onSelect(period));
           return button;
         });
-        document.getElementById(containerId).replaceChildren(...buttons);
+        document.getElementById(containerId + "-buttons").replaceChildren(...buttons);
       }
       function renderReport(snapshot, element) {
         selectedChartPeriod = "YTD";
@@ -430,7 +440,7 @@
           context.fillText(new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: points.length > 1 && (points[points.length - 1][0] - points[0][0]) > 300 * 86400 ? "numeric" : undefined }).format(new Date(points[points.length - 1][0] * 1000)), width - right, height - 4);
         };
         const renderPositions = () => {
-          makePeriods("position-periods", selectedPositionPeriod, period => {
+          makePeriods("position-period", selectedPositionPeriod, period => {
             selectedPositionPeriod = period;
             renderPositions();
           }, element);
@@ -466,13 +476,17 @@
             element("td", "gain-main", pnlTotal),
           );
         };
-        const renderChartPeriods = () => makePeriods("chart-periods", selectedChartPeriod, period => {
+        const renderChartPeriods = () => makePeriods("chart-period", selectedChartPeriod, period => {
           selectedChartPeriod = period;
           renderChartPeriods();
           renderChart();
         }, element);
         renderChartPeriods();
         redrawChart = renderChart;
+        if (typeof ResizeObserver !== "undefined") {
+          chartResizeObserver = new ResizeObserver(() => redrawChart());
+          chartResizeObserver.observe(document.getElementById("chart"));
+        }
         renderChart();
         renderPositions();
       }
