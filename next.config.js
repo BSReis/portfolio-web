@@ -81,12 +81,17 @@ const nextConfig = {
   // Rewrite application paths to the index page so that
   // React Navigation can handle the URL client-side after a hard refresh.
   async rewrites() {
-    return [
-      {
-        source: String.raw`/:path((?!api|_next|favicon|public|share(?:\.html)?(?:/|$)).*)`,
-        destination: '/',
-      },
-    ];
+    return {
+      beforeFiles: [
+        { source: '/share.html', destination: '/share-viewer.htm' },
+      ],
+      afterFiles: [
+        {
+          source: String.raw`/:path((?!api|_next|favicon|public|share(?:-viewer\.htm|\.html)?(?:/|$)).*)`,
+          destination: '/',
+        },
+      ],
+    };
   },
 };
 module.exports = nextConfig;
