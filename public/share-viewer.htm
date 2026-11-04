@@ -8,7 +8,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-mAtuLp7d735afwytnomZ/qiMJZJu16hdKgGr80H/3MI='; style-src 'sha256-ZPiZG7bSK8MbNhwf2TAisfIdP0IlybpfCXy9KXGS8VQ='; base-uri 'none'; form-action 'none'; connect-src 'none'">
   <title>Portfolio</title>
   <style>
-    :root { color-scheme: dark; --background: #111417; --text: #f5f7fa; --muted: #9da5ad; --line: #303638; --accent: #8defc4; }
+    :root { color-scheme: dark; --background: #0f0f0f; --text: #f8fafc; --muted: #64748b; --line: #1e293b; --accent: #6366f1; --positive: #22c55e; --negative: #ef4444; }
     * { box-sizing: border-box; letter-spacing: 0; }
     [hidden] { display: none; }
     body { margin: 0; color: var(--text); background: var(--background); font: 15px/1.5 "Avenir Next", "Segoe UI", sans-serif; }
@@ -32,7 +32,8 @@
     .periods { min-width: 0; max-width: 100%; margin: 0; display: block; padding: 0; border: 0; }
     .period-options { width: 100%; display: flex; justify-content: flex-start; gap: 4px; }
     .period-button { min-width: 38px; padding: 5px 9px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
-    .period-button[aria-pressed="true"] { background: #303638; color: var(--text); }
+    .period-button[aria-pressed="true"] { background: var(--line); color: var(--text); }
+    #chart-periods { padding-bottom: 12px; border-bottom: 1px solid var(--line); }
     .positions-heading { margin: 24px 0 8px; }
     .positions-heading h2 { margin: 0; font-size: 17px; font-weight: 600; }
     #position-periods { margin-bottom: 12px; }
@@ -47,7 +48,7 @@
     .eyebrow { color: var(--accent); font-size: 12px; font-weight: 600; margin: 0 0 12px; }
     h1 { font: 400 36px/1.2 Georgia, serif; margin: 0 0 18px; overflow-wrap: anywhere; }
     time { color: var(--muted); font-size: 13px; }
-    .ring { --segments: #303638 0% 100%; width: 196px; height: 196px; border-radius: 50%; background: conic-gradient(var(--segments)); display: grid; place-items: center; position: relative; }
+    .ring { --segments: var(--line) 0% 100%; width: 196px; height: 196px; border-radius: 50%; background: conic-gradient(var(--segments)); display: grid; place-items: center; position: relative; }
     .ring::before { content: ""; position: absolute; inset: 18px; border-radius: 50%; background: var(--background); }
     .ring-label { position: relative; text-align: center; }
     .ring-number { display: block; font-size: 32px; font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -68,7 +69,7 @@
     .position-unit-price { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
     .gain-main { font-weight: 500; }
     .gain-detail { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-    .bar { width: 76px; height: 3px; background: #303638; margin: 8px 0 0 auto; }
+    .bar { width: 76px; height: 3px; background: var(--line); margin: 8px 0 0 auto; }
     .bar-fill { height: 100%; }
     tfoot th, tfoot td { padding-top: 20px; font-weight: 500; text-align: left; font-variant-numeric: tabular-nums; }
     .error { padding: 56px 0; }
@@ -154,7 +155,7 @@
     (function () {
       "use strict";
       const periods = ["1D", "1W", "1M", "YTD", "1Y", "5Y", "Max"];
-      const palette = ["#8defc4", "#75a9ff", "#f4cb69", "#f29caf", "#bca9f0", "#61ccd4", "#b8ce76", "#e8a77e"];
+      const palette = ["#6366f1", "#22c55e", "#f59e0b", "#38bdf8", "#ef4444", "#a78bfa", "#14b8a6", "#f97316"];
       let redrawChart = () => {};
       let chartResizeObserver = null;
       window.addEventListener("resize", () => redrawChart());
@@ -267,7 +268,7 @@
         document.getElementById("columns").className = "";
         document.getElementById("report").hidden = true;
         if (chartResizeObserver) { chartResizeObserver.disconnect(); chartResizeObserver = null; }
-        document.getElementById("ring").style.setProperty("--segments", "#303638 0% 100%");
+        document.getElementById("ring").style.setProperty("--segments", "#1e293b 0% 100%");
         document.getElementById("error").hidden = false;
         document.getElementById("portfolio").hidden = true;
         const snapshot = readSnapshot(location.hash.startsWith("#d=") ? location.hash.slice(3) : "");
@@ -383,7 +384,7 @@
           const gain = document.getElementById("report-gain");
           const gainPct = document.getElementById("report-gain-pct");
           gain.textContent = data.gain === null ? "N/A" : formatCurrency(data.gain, snapshot.currency);
-          gain.style.color = data.gain === null ? "#9da5ad" : data.gain >= 0 ? "#8defc4" : "#f29caf";
+          gain.style.color = data.gain === null ? "#94a3b8" : data.gain >= 0 ? "#22c55e" : "#ef4444";
           gainPct.textContent = data.gainPct === null ? "" : formatPercent(data.gainPct);
           gainPct.style.color = gain.style.color;
           const canvas = document.getElementById("chart");
@@ -418,10 +419,10 @@
           for (let tick = 0; tick <= 3; tick += 1) {
             const value = minimum + (maximum - minimum) * tick / 3;
             const y = yAt(value);
-            context.strokeStyle = "#303638";
+            context.strokeStyle = "#1e293b";
             context.lineWidth = 1;
             context.beginPath(); context.moveTo(left, y); context.lineTo(width - right, y); context.stroke();
-            context.fillStyle = "#9da5ad";
+            context.fillStyle = "#64748b";
             context.fillText(new Intl.NumberFormat(undefined, { style: "currency", currency: snapshot.currency, notation: "compact", maximumFractionDigits: 1 }).format(value), left - 8, y);
           }
           context.beginPath();
@@ -430,29 +431,85 @@
             const y = yAt(point[1]);
             if (index === 0) context.moveTo(x, y); else context.lineTo(x, y);
           });
-          context.strokeStyle = "#8defc4";
+          context.strokeStyle = data.gain === null ? "#6366f1" : data.gain >= 0 ? "#22c55e" : "#ef4444";
           context.lineWidth = 2;
           context.lineJoin = "round";
           context.lineCap = "round";
           context.stroke();
-          context.fillStyle = "#9da5ad";
+          context.fillStyle = "#64748b";
           context.textAlign = "left";
           context.textBaseline = "alphabetic";
           context.fillText(new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(points[0][0] * 1000)), left, height - 4);
           context.textAlign = "right";
           context.fillText(new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: points.length > 1 && (points[points.length - 1][0] - points[0][0]) > 300 * 86400 ? "numeric" : undefined }).format(new Date(points[points.length - 1][0] * 1000)), width - right, height - 4);
         };
+        const renderColumns = () => {
+          const columns = document.getElementById("columns");
+          const makeSortHeader = (label, key) => {
+            const heading = element("th");
+            heading.scope = "col";
+            const button = element("button", "sort-button");
+            button.type = "button";
+            const active = selectedSortKey === key;
+            const direction = sortAscending ? "ascending" : "descending";
+            button.setAttribute("aria-label", `Sort by ${label}, ${active ? direction : "descending"}`);
+            button.setAttribute("aria-pressed", String(active));
+            const arrow = active ? (sortAscending ? "↑" : "↓") : "↕";
+            button.append(element("span", "", label), element("span", "sort-arrow", arrow));
+            button.addEventListener("click", () => {
+              if (selectedSortKey === key) sortAscending = !sortAscending;
+              else {
+                selectedSortKey = key;
+                sortAscending = false;
+              }
+              renderColumns();
+              renderPositions();
+            });
+            heading.setAttribute("aria-sort", active ? direction : "none");
+            heading.append(button);
+            return heading;
+          };
+          const holdingHeading = element("th", "", "Holding");
+          holdingHeading.scope = "col";
+          columns.replaceChildren(
+            holdingHeading,
+            makeSortHeader("Weight", "weight"),
+            makeSortHeader("Position", "position"),
+            makeSortHeader("P/L", "pnl"),
+          );
+        };
         const renderPositions = () => {
           makePeriods("position-period", selectedPositionPeriod, period => {
             selectedPositionPeriod = period;
+            renderColumns();
             renderPositions();
           }, element);
           const rows = [];
-          snapshot.positions.forEach((position, index) => {
+          const orderedPositions = [...snapshot.positions].sort((left, right) => {
+            const leftMetric = selectedSortKey === "weight"
+              ? left.weight
+              : selectedSortKey === "position"
+                ? left.value
+                : left.performance[selectedPositionPeriod].gain;
+            const rightMetric = selectedSortKey === "weight"
+              ? right.weight
+              : selectedSortKey === "position"
+                ? right.value
+                : right.performance[selectedPositionPeriod].gain;
+            if (leftMetric === null) return rightMetric === null ? 0 : 1;
+            if (rightMetric === null) return -1;
+            const order = leftMetric - rightMetric;
+            return sortAscending ? order : -order;
+          });
+          const colorBySymbol = new Map(snapshot.positions.map((position, index) => [
+            position.symbol,
+            palette[index % palette.length],
+          ]));
+          orderedPositions.forEach(position => {
             const row = element("tr");
             const heading = element("th"); heading.scope = "row";
             const holding = element("div", "holding");
-            const swatch = element("span", "swatch"); swatch.style.backgroundColor = palette[index % palette.length];
+            const swatch = element("span", "swatch"); swatch.style.backgroundColor = colorBySymbol.get(position.symbol);
             const identity = element("div", "position-identity");
             identity.append(element("div", "symbol", position.symbol), element("div", "company", position.name), element("div", "shares", formatShares(position.shares) + (position.symbol.startsWith("CASH_") ? " cash" : " shares")));
             holding.append(swatch, identity); heading.append(holding);
@@ -464,7 +521,7 @@
             const metric = position.performance[selectedPositionPeriod];
             pnl.append(element("div", "gain-main", metric.gain === null ? "N/A" : formatCurrency(metric.gain, snapshot.currency)));
             pnl.append(element("div", "gain-detail", metric.gainPct === null ? "" : formatPercent(metric.gainPct)));
-            if (metric.gain !== null) pnl.style.color = metric.gain >= 0 ? "#8defc4" : "#f29caf";
+            if (metric.gain !== null) pnl.style.color = metric.gain >= 0 ? "#22c55e" : "#ef4444";
             row.append(heading, weight, value, pnl);
             rows.push(row);
           });
@@ -486,6 +543,7 @@
           renderChartPeriods();
           renderChart();
         }, element);
+        renderColumns();
         renderChartPeriods();
         redrawChart = renderChart;
         if (typeof ResizeObserver !== "undefined") {
