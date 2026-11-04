@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex, nofollow">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-MnP3HtZRJKBLcOHn14kwyvlZ28A9mugttljLkGD1u/I='; style-src 'sha256-iRdyYa3mZM823FlRMFSZXKbMt/IAAOgiOYk5PYwr/pE='; base-uri 'none'; form-action 'none'; connect-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-MnP3HtZRJKBLcOHn14kwyvlZ28A9mugttljLkGD1u/I='; style-src 'sha256-gI+ulwNO45bqBUn6FxGUa6B2s/lnS0VIPp+UFfhrpNI='; base-uri 'none'; form-action 'none'; connect-src 'none'">
   <title>Portfolio</title>
   <style>
     :root { color-scheme: dark; --background: #0f0f0f; --text: #f8fafc; --muted: #64748b; --line: #1e293b; --accent: #6366f1; --positive: #22c55e; --negative: #ef4444; }
@@ -41,16 +41,19 @@
     .sort-arrow { color: var(--muted); font-size: 12px; }
     .sort-button[aria-pressed="true"] { color: var(--text); }
     .sort-button[aria-pressed="true"] .sort-arrow { color: var(--text); }
-    #columns.is-report th:nth-child(2), #columns.is-report th:nth-child(3) { text-align: right; }
+    #columns.is-report th:nth-child(2), #columns.is-report th:nth-child(3), #columns.is-report th:nth-child(4) { text-align: right; }
     #columns.is-report th:nth-child(2) { width: 80px; }
     #columns.is-report th:nth-child(3) { width: 140px; }
     #columns.is-report th:last-child { width: 150px; }
+    #positions td:nth-child(2), #positions td:nth-child(3), #positions td:nth-child(4), #total-row td { text-align: right; }
     .eyebrow { color: var(--accent); font-size: 12px; font-weight: 600; margin: 0 0 12px; }
     h1 { font: 400 36px/1.2 Georgia, serif; margin: 0 0 18px; overflow-wrap: anywhere; }
     time { color: var(--muted); font-size: 13px; }
-    .ring { --segments: var(--line) 0% 100%; width: 196px; height: 196px; border-radius: 50%; background: conic-gradient(var(--segments)); display: grid; place-items: center; position: relative; }
-    .ring::before { content: ""; position: absolute; inset: 18px; border-radius: 50%; background: var(--background); }
+    .ring { width: 196px; height: 196px; border-radius: 50%; background: var(--line); display: grid; place-items: center; position: relative; overflow: hidden; }
+    .ring canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .ring::before { content: ""; position: absolute; inset: 18px; z-index: 1; border-radius: 50%; background: var(--background); pointer-events: none; }
     .ring-label { position: relative; text-align: center; }
+    .ring-label { z-index: 2; }
     .ring-number { display: block; font-size: 32px; font-weight: 600; font-variant-numeric: tabular-nums; }
     .ring-caption { display: block; color: var(--muted); font-size: 12px; }
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
@@ -61,6 +64,14 @@
     .holding { display: flex; align-items: flex-start; gap: 12px; min-width: 0; padding-right: 16px; }
     .position-identity { min-width: 0; }
     .swatch { display: block; width: 8px; height: 8px; border-radius: 2px; margin-top: 7px; flex: 0 0 8px; }
+    .swatch-0 { background: #6366f1; }
+    .swatch-1 { background: #22c55e; }
+    .swatch-2 { background: #f59e0b; }
+    .swatch-3 { background: #38bdf8; }
+    .swatch-4 { background: #ef4444; }
+    .swatch-5 { background: #a78bfa; }
+    .swatch-6 { background: #14b8a6; }
+    .swatch-7 { background: #f97316; }
     .symbol { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
     .company { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
     .shares { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
@@ -69,8 +80,12 @@
     .position-unit-price { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
     .gain-main { font-weight: 500; }
     .gain-detail { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-    .bar { width: 76px; height: 3px; background: var(--line); margin: 8px 0 0 auto; }
-    .bar-fill { height: 100%; }
+    progress.bar { appearance: none; display: block; width: 76px; height: 3px; border: 0; border-radius: 2px; background: var(--line); color: var(--accent); margin: 8px 0 0 auto; }
+    progress.bar::-webkit-progress-bar { background: var(--line); border-radius: 2px; }
+    progress.bar::-webkit-progress-value { background: var(--accent); border-radius: 2px; }
+    progress.bar::-moz-progress-bar { background: var(--accent); border-radius: 2px; }
+    .gain-positive { color: var(--positive); }
+    .gain-negative { color: var(--negative); }
     tfoot th, tfoot td { padding-top: 20px; font-weight: 500; text-align: left; font-variant-numeric: tabular-nums; }
     .error { padding: 56px 0; }
     .error p { color: var(--muted); }
@@ -103,7 +118,7 @@
       :root { --background: #fff; --text: #111417; --muted: #515960; --line: #d3d8da; color-scheme: light; }
       body::before { display: none; }
       main { width: 100%; padding: 0; }
-      .ring, .swatch, .bar-fill { print-color-adjust: exact; }
+      .ring, .swatch, .bar { print-color-adjust: exact; }
     }
   </style>
 </head>
@@ -121,7 +136,7 @@
           <h1 id="name">Portfolio</h1>
           <time id="date"></time>
         </div>
-        <div class="ring" id="ring" aria-hidden="true"><div class="ring-label"><span id="count" class="ring-number"></span><span class="ring-caption">positions</span></div></div>
+        <div class="ring" id="ring" aria-hidden="true"><canvas id="ring-chart"></canvas><div class="ring-label"><span id="count" class="ring-number"></span><span class="ring-caption">positions</span></div></div>
       </div>
       <section id="report" class="report" hidden>
         <div class="report-heading">
@@ -157,8 +172,37 @@
       const periods = ["1D", "1W", "1M", "YTD", "1Y", "5Y", "Max"];
       const palette = ["#6366f1", "#22c55e", "#f59e0b", "#38bdf8", "#ef4444", "#a78bfa", "#14b8a6", "#f97316"];
       let redrawChart = () => {};
+      let redrawRing = () => {};
       let chartResizeObserver = null;
-      window.addEventListener("resize", () => redrawChart());
+      window.addEventListener("resize", () => { redrawChart(); redrawRing(); });
+
+      function drawRing(positions) {
+        const canvas = document.getElementById("ring-chart");
+        const bounds = canvas.getBoundingClientRect();
+        const scale = window.devicePixelRatio || 1;
+        const width = Math.max(1, bounds.width);
+        const height = Math.max(1, bounds.height);
+        canvas.width = Math.round(width * scale);
+        canvas.height = Math.round(height * scale);
+        const context = canvas.getContext("2d");
+        if (!context) return;
+        context.setTransform(scale, 0, 0, scale, 0, 0);
+        context.clearRect(0, 0, width, height);
+        const total = positions.reduce((sum, position) => sum + position.weight, 0);
+        if (total <= 0) return;
+        const radius = Math.min(width, height) / 2;
+        let start = -Math.PI / 2;
+        positions.forEach((position, index) => {
+          const end = start + (position.weight / total) * Math.PI * 2;
+          context.beginPath();
+          context.moveTo(radius, radius);
+          context.arc(radius, radius, radius, start, end);
+          context.closePath();
+          context.fillStyle = palette[index % palette.length];
+          context.fill();
+          start = end;
+        });
+      }
 
       function decodeCompact(encoded) {
         if (!/^[A-Za-z0-9_-]+$/.test(encoded) || encoded.length % 4 === 1) return null;
@@ -268,7 +312,8 @@
         document.getElementById("columns").className = "";
         document.getElementById("report").hidden = true;
         if (chartResizeObserver) { chartResizeObserver.disconnect(); chartResizeObserver = null; }
-        document.getElementById("ring").style.setProperty("--segments", "#1e293b 0% 100%");
+        redrawRing = () => drawRing([]);
+        drawRing([]);
         document.getElementById("error").hidden = false;
         document.getElementById("portfolio").hidden = true;
         const snapshot = readSnapshot(location.hash.startsWith("#d=") ? location.hash.slice(3) : "");
@@ -285,20 +330,13 @@
         date.dateTime = snapshot.date;
         date.textContent = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(snapshot.date));
         document.getElementById("count").textContent = String(snapshot.positions.length);
-        let cumulative = 0;
-        const segments = [];
         const rows = [];
         snapshot.positions.forEach((position, index) => {
-          const color = palette[index % palette.length];
-          const end = Math.min(100, cumulative + position.weight);
-          segments.push(color + " " + cumulative + "% " + end + "%");
-          cumulative = end;
           const row = element("tr");
           const heading = element("th");
           heading.scope = "row";
           const holding = element("div", "holding");
-          const swatch = element("span", "swatch");
-          swatch.style.backgroundColor = color;
+          const swatch = element("span", `swatch swatch-${index % palette.length}`);
           const identity = element("div", "position-identity");
           identity.append(element("div", "symbol", position.symbol), element("div", "company", position.name));
           if (snapshot.v === 2) identity.append(element("div", "shares", formatShares(position.shares) + " shares"));
@@ -306,12 +344,10 @@
           heading.append(holding);
           const allocation = element("td");
           allocation.append(element("div", "weight", position.weight.toFixed(2) + "%"));
-          const bar = element("div", "bar");
-          bar.setAttribute("aria-hidden", "true");
-          const fill = element("div", "bar-fill");
-          fill.style.width = position.weight + "%";
-          fill.style.backgroundColor = color;
-          bar.append(fill);
+          const bar = element("progress", "bar");
+          bar.max = 100;
+          bar.value = position.weight;
+          bar.setAttribute("aria-label", `Allocation ${position.weight.toFixed(2)}%`);
           allocation.append(bar);
           if (snapshot.v === 2) {
             const positionValue = element("td");
@@ -320,7 +356,7 @@
             const metric = position.performance[selectedPositionPeriod];
             pnl.append(element("div", "gain-main", metric.gain === null ? "N/A" : formatCurrency(metric.gain, snapshot.currency)));
             pnl.append(element("div", "gain-detail", metric.gainPct === null ? "" : formatPercent(metric.gainPct)));
-            if (metric.gain !== null) pnl.style.color = metric.gain >= 0 ? "#22c55e" : "#ef4444";
+            if (metric.gain !== null) pnl.className += metric.gain >= 0 ? " gain-positive" : " gain-negative";
             row.append(heading, allocation, positionValue, pnl);
           } else {
             row.append(heading, allocation);
@@ -341,7 +377,8 @@
         totalRow.replaceChildren(element("th", "", "Total"), element("td", "", "100.00%"));
         if (snapshot.v === 2)
           totalRow.append(element("td", "position-value", formatCurrency(totalValue, snapshot.currency)), element("td", ""));
-        document.getElementById("ring").style.setProperty("--segments", segments.join(", "));
+        redrawRing = () => drawRing(snapshot.positions);
+        drawRing(snapshot.positions);
         document.getElementById("error").hidden = true;
         document.getElementById("portfolio").hidden = false;
         if (snapshot.v === 2) renderReport(snapshot, element);
@@ -384,9 +421,9 @@
           const gain = document.getElementById("report-gain");
           const gainPct = document.getElementById("report-gain-pct");
           gain.textContent = data.gain === null ? "N/A" : formatCurrency(data.gain, snapshot.currency);
-          gain.style.color = data.gain === null ? "#94a3b8" : data.gain >= 0 ? "#22c55e" : "#ef4444";
+          gain.className = "gain-main " + (data.gain === null ? "" : data.gain >= 0 ? "gain-positive" : "gain-negative");
           gainPct.textContent = data.gainPct === null ? "" : formatPercent(data.gainPct);
-          gainPct.style.color = gain.style.color;
+          gainPct.className = data.gain === null ? "" : data.gain >= 0 ? "gain-positive" : "gain-negative";
           const canvas = document.getElementById("chart");
           const empty = document.getElementById("chart-empty");
           const points = data.points;
@@ -503,13 +540,13 @@
           });
           const colorBySymbol = new Map(snapshot.positions.map((position, index) => [
             position.symbol,
-            palette[index % palette.length],
+            index % palette.length,
           ]));
           orderedPositions.forEach(position => {
             const row = element("tr");
             const heading = element("th"); heading.scope = "row";
             const holding = element("div", "holding");
-            const swatch = element("span", "swatch"); swatch.style.backgroundColor = colorBySymbol.get(position.symbol);
+            const swatch = element("span", `swatch swatch-${colorBySymbol.get(position.symbol) ?? 0}`);
             const identity = element("div", "position-identity");
             identity.append(element("div", "symbol", position.symbol), element("div", "company", position.name), element("div", "shares", formatShares(position.shares) + (position.symbol.startsWith("CASH_") ? " cash" : " shares")));
             holding.append(swatch, identity); heading.append(holding);
@@ -521,7 +558,7 @@
             const metric = position.performance[selectedPositionPeriod];
             pnl.append(element("div", "gain-main", metric.gain === null ? "N/A" : formatCurrency(metric.gain, snapshot.currency)));
             pnl.append(element("div", "gain-detail", metric.gainPct === null ? "" : formatPercent(metric.gainPct)));
-            if (metric.gain !== null) pnl.style.color = metric.gain >= 0 ? "#22c55e" : "#ef4444";
+            if (metric.gain !== null) pnl.className += metric.gain >= 0 ? " gain-positive" : " gain-negative";
             row.append(heading, weight, value, pnl);
             rows.push(row);
           });
