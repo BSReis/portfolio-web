@@ -349,6 +349,8 @@
 
       let selectedChartPeriod = "YTD";
       let selectedPositionPeriod = "YTD";
+      let selectedSortKey = "weight";
+      let sortAscending = false;
       function formatCurrency(value, currency) {
         return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 2 }).format(value);
       }
@@ -371,9 +373,11 @@
       function renderReport(snapshot, element) {
         selectedChartPeriod = "YTD";
         selectedPositionPeriod = "YTD";
+        selectedSortKey = "weight";
+        sortAscending = false;
         document.getElementById("report").hidden = false;
         const currentValue = snapshot.positions.reduce((sum, position) => sum + position.value, 0);
-        document.getElementById("report-value").textContent = "Current position " + formatCurrency(currentValue, snapshot.currency);
+        document.getElementById("report-value").textContent = formatCurrency(currentValue, snapshot.currency);
         const renderChart = () => {
           const data = snapshot.periods[selectedChartPeriod];
           const gain = document.getElementById("report-gain");
