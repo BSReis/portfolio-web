@@ -20,6 +20,26 @@
     .brand-mark span:nth-child(2) { height: 15px; }
     .brand-mark span:nth-child(3) { height: 21px; }
     .summary { display: grid; grid-template-columns: minmax(0, 1fr) 196px; align-items: center; gap: 32px; padding: 36px 0; }
+    .report { border-top: 1px solid var(--line); padding: 24px 0 32px; }
+    .report-heading, .positions-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; }
+    .report-heading { margin-bottom: 12px; }
+    .report-heading .eyebrow { margin-bottom: 6px; }
+    .report-gain { display: flex; align-items: baseline; gap: 8px; font-size: 19px; font-variant-numeric: tabular-nums; }
+    .report-gain strong { font-weight: 600; }
+    .report-gain span, .report-value { color: var(--muted); font-size: 13px; }
+    .chart-wrap { min-height: 220px; position: relative; }
+    canvas { display: block; width: 100%; height: 220px; }
+    .chart-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; }
+    .periods { display: flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 8px; }
+    .period-button { min-width: 46px; padding: 6px 9px; border: 0; border-radius: 5px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+    .period-button[aria-pressed="true"] { background: #303638; color: var(--text); }
+    .positions-heading { align-items: center; margin: 24px 0 16px; }
+    .positions-heading h2 { margin: 0; font-size: 17px; font-weight: 600; }
+    #position-periods { flex: 0 1 auto; }
+    #columns.is-report th:nth-child(2), #columns.is-report th:nth-child(3) { text-align: right; }
+    #columns.is-report th:nth-child(2) { width: 80px; }
+    #columns.is-report th:nth-child(3) { width: 140px; }
+    #columns.is-report th:last-child { width: 150px; }
     .eyebrow { color: var(--accent); font-size: 12px; font-weight: 600; margin: 0 0 12px; }
     h1 { font: 400 36px/1.2 Georgia, serif; margin: 0 0 18px; overflow-wrap: anywhere; }
     time { color: var(--muted); font-size: 13px; }
@@ -34,10 +54,15 @@
     tbody th, tbody td { border-bottom: 1px solid var(--line); padding: 18px 0; vertical-align: middle; }
     tbody th { font-weight: 400; text-align: left; }
     .holding { display: flex; align-items: flex-start; gap: 12px; min-width: 0; padding-right: 16px; }
+    .position-identity { min-width: 0; }
     .swatch { display: block; width: 8px; height: 8px; border-radius: 2px; margin-top: 7px; flex: 0 0 8px; }
     .symbol { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
     .company { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+    .shares { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
     .weight { font-size: 17px; font-variant-numeric: tabular-nums; }
+    .position-value, .gain-main { font-size: 14px; font-variant-numeric: tabular-nums; }
+    .gain-main { font-weight: 500; }
+    .gain-detail { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
     .bar { width: 76px; height: 3px; background: #303638; margin: 8px 0 0 auto; }
     .bar-fill { height: 100%; }
     tfoot th, tfoot td { padding-top: 20px; font-weight: 500; text-align: left; font-variant-numeric: tabular-nums; }
@@ -47,6 +72,22 @@
       main { width: calc(100% - 32px); padding-top: 24px; }
       .summary { grid-template-columns: minmax(0, 1fr) 112px; gap: 16px; padding: 28px 0; }
       h1 { font-size: 26px; }
+      .report { padding-top: 20px; }
+      .report-heading, .positions-heading { align-items: flex-start; flex-direction: column; }
+      .positions-heading { gap: 10px; }
+      #position-periods { align-self: stretch; }
+      .periods { justify-content: space-between; gap: 1px; }
+      .period-button { min-width: 0; flex: 1; padding: 6px 3px; font-size: 11px; }
+      .chart-wrap, canvas { height: 190px; min-height: 190px; }
+      #columns.is-report th:nth-child(2) { width: 56px; }
+      #columns.is-report th:nth-child(3) { width: 92px; }
+      #columns.is-report th:last-child { width: 96px; }
+      tbody th, tbody td { padding: 13px 0; }
+      .holding { gap: 7px; padding-right: 6px; }
+      .symbol { font-size: 12px; }
+      .company, .shares, .gain-detail { font-size: 10px; }
+      .position-value, .gain-main, .weight { font-size: 12px; }
+      .bar { width: 48px; }
       .ring { width: 112px; height: 112px; }
       .ring::before { inset: 10px; }
       .ring-number { font-size: 25px; }
@@ -77,8 +118,26 @@
         </div>
         <div class="ring" id="ring" aria-hidden="true"><div class="ring-label"><span id="count" class="ring-number"></span><span class="ring-caption">positions</span></div></div>
       </div>
+      <section id="report" class="report" hidden>
+        <div class="report-heading">
+          <div>
+            <p class="eyebrow">PORTFOLIO GROWTH</p>
+            <div class="report-gain"><strong id="report-gain"></strong><span id="report-gain-pct"></span></div>
+          </div>
+          <p class="report-value" id="report-value"></p>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="chart" role="img" aria-label="Portfolio value over time"></canvas>
+          <p id="chart-empty" class="chart-empty" hidden>No chart data is available for this period.</p>
+        </div>
+        <div id="chart-periods" class="periods" role="group" aria-label="Growth period"></div>
+        <div class="positions-heading">
+          <h2>Positions</h2>
+          <div id="position-periods" class="periods" role="group" aria-label="Position profit and loss period"></div>
+        </div>
+      </section>
       <table aria-label="Portfolio allocation percentages">
-        <thead><tr><th scope="col">Holding</th><th scope="col">Weight</th></tr></thead>
+        <thead><tr id="columns"><th scope="col">Holding</th><th scope="col">Weight</th></tr></thead>
         <tbody id="positions"></tbody>
         <tfoot><tr><th scope="row">Total</th><td>100.00%</td></tr></tfoot>
       </table>
@@ -87,26 +146,108 @@
   <script>
     (function () {
       "use strict";
+      const periods = ["1D", "1W", "1M", "YTD", "1Y", "5Y", "Max"];
+      let redrawChart = () => {};
+      window.addEventListener("resize", () => redrawChart());
+
+      function decodeCompact(encoded) {
+        if (!/^[A-Za-z0-9_-]+$/.test(encoded) || encoded.length % 4 === 1) return null;
+        const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        const source = encoded.replaceAll("-", "+").replaceAll("_", "/");
+        let binary = "";
+        for (let index = 0; index < source.length; index += 4) {
+          const quartet = source.slice(index, index + 4);
+          const first = alphabet.indexOf(quartet[0]);
+          const second = alphabet.indexOf(quartet[1]);
+          const third = quartet[2] ? alphabet.indexOf(quartet[2]) : 0;
+          const fourth = quartet[3] ? alphabet.indexOf(quartet[3]) : 0;
+          if (first < 0 || second < 0 || third < 0 || fourth < 0) return null;
+          binary += String.fromCodePoint((first << 2) | (second >> 4));
+          if (quartet.length > 2) binary += String.fromCodePoint(((second & 15) << 4) | (third >> 2));
+          if (quartet.length > 3) binary += String.fromCodePoint(((third & 3) << 6) | fourth);
+        }
+        const bytes = Array.from(binary, byte => "%" + byte.codePointAt(0).toString(16).padStart(2, "0")).join("");
+        return JSON.parse(decodeURIComponent(bytes));
+      }
+
+      function expandCompact(value) {
+        if (!value || value.v !== 2 || typeof value.n !== "string" || typeof value.d !== "string" ||
+          typeof value.c !== "string" || !Array.isArray(value.p) || !Array.isArray(value.r) || value.r.length !== periods.length) return null;
+        const positions = value.p.map(entry => {
+          if (!Array.isArray(entry) || entry.length !== 5 + periods.length * 2) return null;
+          const performance = {};
+          periods.forEach((period, index) => {
+            performance[period] = { gain: entry[5 + index * 2], gainPct: entry[6 + index * 2] };
+          });
+          return { symbol: entry[0], name: entry[1], weight: entry[2], shares: entry[3], value: entry[4], performance };
+        });
+        if (positions.includes(null)) return null;
+        const reportPeriods = {};
+        periods.forEach((period, index) => {
+          const entry = value.r[index];
+          if (Array.isArray(entry) && entry.length === 3)
+            reportPeriods[period] = { gain: entry[0], gainPct: entry[1], points: entry[2] };
+        });
+        if (periods.some(period => !reportPeriods[period])) return null;
+        return { v: 2, name: value.n, date: value.d, currency: value.c, positions, periods: reportPeriods };
+      }
+
       function readSnapshot(encoded) {
         if (!encoded || encoded.length > 12000) return null;
         try {
-          const value = JSON.parse(decodeURIComponent(encoded));
-          if (!value || value.v !== 1 || typeof value.name !== "string" || !value.name.trim() || value.name.length > 80 ||
+          let value = encoded.startsWith("2.") ? expandCompact(decodeCompact(encoded.slice(2))) : JSON.parse(decodeURIComponent(encoded));
+          if (!value || ![1, 2].includes(value.v) || typeof value.name !== "string" || !value.name.trim() || value.name.length > 80 ||
             typeof value.date !== "string" || !Number.isFinite(Date.parse(value.date)) ||
             !Array.isArray(value.positions) || !value.positions.length || value.positions.length > 100) return null;
+          if (value.v === 2 && (typeof value.currency !== "string" || !/^[A-Z]{3}$/.test(value.currency))) return null;
           const positions = [];
           for (const position of value.positions) {
             if (!position || typeof position.symbol !== "string" || !position.symbol.trim() || position.symbol.length > 40 ||
               typeof position.name !== "string" || !position.name.trim() || position.name.length > 120 ||
               typeof position.weight !== "number" || !Number.isFinite(position.weight) || position.weight < 0 || position.weight > 100 ||
               Math.abs(position.weight * 100 - Math.round(position.weight * 100)) > 0.000001) return null;
-            positions.push({ symbol: position.symbol, name: position.name, weight: position.weight });
+            if (value.v === 1) {
+              positions.push({ symbol: position.symbol, name: position.name, weight: position.weight });
+              continue;
+            }
+            if (typeof position.shares !== "number" || !Number.isFinite(position.shares) || position.shares < 0 ||
+              typeof position.value !== "number" || !Number.isFinite(position.value) || position.value < 0 ||
+              !position.performance || typeof position.performance !== "object") return null;
+            const performance = {};
+            for (const period of periods) {
+              const metric = position.performance[period];
+              if (!metric || typeof metric !== "object" ||
+                (metric.gain !== null && (typeof metric.gain !== "number" || !Number.isFinite(metric.gain))) ||
+                (metric.gainPct !== null && (typeof metric.gainPct !== "number" || !Number.isFinite(metric.gainPct)))) return null;
+              performance[period] = { gain: metric.gain, gainPct: metric.gainPct };
+            }
+            positions.push({ symbol: position.symbol, name: position.name, weight: position.weight,
+              shares: position.shares, value: position.value, performance });
           }
           if (Math.abs(positions.reduce((sum, position) => sum + position.weight, 0) - 100) > 0.001 ||
             new Set(positions.map((position) => position.symbol)).size !== positions.length) return null;
-          return { name: value.name, date: value.date, positions };
+          if (value.v === 1) return { v: 1, name: value.name, date: value.date, positions };
+          const reportPeriods = {};
+          for (const period of periods) {
+            const data = value.periods[period];
+            if (!data || typeof data !== "object" ||
+              (data.gain !== null && (typeof data.gain !== "number" || !Number.isFinite(data.gain))) ||
+              (data.gainPct !== null && (typeof data.gainPct !== "number" || !Number.isFinite(data.gainPct))) ||
+              !Array.isArray(data.points) || data.points.length > 100) return null;
+            let lastTimestamp = -1;
+            const points = [];
+            for (const point of data.points) {
+              if (!Array.isArray(point) || point.length !== 2 || !Number.isSafeInteger(point[0]) || point[0] <= lastTimestamp ||
+                typeof point[1] !== "number" || !Number.isFinite(point[1]) || point[1] < 0) return null;
+              lastTimestamp = point[0];
+              points.push([point[0], point[1]]);
+            }
+            reportPeriods[period] = { gain: data.gain, gainPct: data.gainPct, points };
+          }
+          return { v: 2, name: value.name, date: value.date, currency: value.currency, positions, periods: reportPeriods };
         } catch { return null; }
       }
+
       function renderSnapshot() {
         document.title = "Portfolio";
         document.getElementById("name").textContent = "Portfolio";
@@ -114,11 +255,13 @@
         document.getElementById("date").textContent = "";
         document.getElementById("count").textContent = "";
         document.getElementById("positions").replaceChildren();
+        document.getElementById("columns").className = "";
+        document.getElementById("report").hidden = true;
         document.getElementById("ring").style.setProperty("--segments", "#303638 0% 100%");
         document.getElementById("error").hidden = false;
         document.getElementById("portfolio").hidden = true;
         const snapshot = readSnapshot(location.hash.startsWith("#d=") ? location.hash.slice(3) : "");
-        if (!snapshot) return;
+        if (!snapshot) { redrawChart = () => {}; return; }
         const palette = ["#8defc4", "#75a9ff", "#f4cb69", "#f29caf", "#bca9f0", "#61ccd4", "#b8ce76", "#e8a77e"];
         const element = (tag, className, text) => {
           const node = document.createElement(tag);
@@ -146,8 +289,9 @@
           const holding = element("div", "holding");
           const swatch = element("span", "swatch");
           swatch.style.backgroundColor = color;
-          const identity = element("div");
+          const identity = element("div", "position-identity");
           identity.append(element("div", "symbol", position.symbol), element("div", "company", position.name));
+          if (snapshot.v === 2) identity.append(element("div", "shares", formatShares(position.shares) + " shares"));
           holding.append(swatch, identity);
           heading.append(holding);
           const allocation = element("td");
@@ -159,14 +303,156 @@
           fill.style.backgroundColor = color;
           bar.append(fill);
           allocation.append(bar);
-          row.append(heading, allocation);
+          if (snapshot.v === 2) {
+            const positionValue = element("td");
+            positionValue.append(element("div", "position-value", formatCurrency(position.value, snapshot.currency)));
+            const pnl = element("td", "pnl-cell");
+            const metric = position.performance[selectedPositionPeriod];
+            pnl.append(element("div", "gain-main", metric.gain === null ? "N/A" : formatCurrency(metric.gain, snapshot.currency)));
+            pnl.append(element("div", "gain-detail", metric.gainPct === null ? "" : formatPercent(metric.gainPct)));
+            if (metric.gain !== null) pnl.style.color = metric.gain >= 0 ? "#8defc4" : "#f29caf";
+            row.append(heading, allocation, positionValue, pnl);
+          } else {
+            row.append(heading, allocation);
+          }
           rows.push(row);
         });
         document.getElementById("positions").replaceChildren(...rows);
+        document.getElementById("columns").className = snapshot.v === 2 ? "is-report" : "";
         document.getElementById("ring").style.setProperty("--segments", segments.join(", "));
         document.getElementById("error").hidden = true;
         document.getElementById("portfolio").hidden = false;
+        if (snapshot.v === 2) renderReport(snapshot, element);
+        else redrawChart = () => {};
       }
+
+      let selectedChartPeriod = "YTD";
+      let selectedPositionPeriod = "YTD";
+      function formatCurrency(value, currency) {
+        return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 2 }).format(value);
+      }
+      function formatShares(value) {
+        return new Intl.NumberFormat(undefined, { maximumFractionDigits: 4 }).format(value);
+      }
+      function formatPercent(value) {
+        return (value > 0 ? "+" : "") + value.toFixed(2) + "%";
+      }
+      function makePeriods(containerId, selected, onSelect, element) {
+        const buttons = periods.map(period => {
+          const button = element("button", "period-button", period);
+          button.type = "button";
+          button.setAttribute("aria-pressed", String(period === selected));
+          button.addEventListener("click", () => onSelect(period));
+          return button;
+        });
+        document.getElementById(containerId).replaceChildren(...buttons);
+      }
+      function renderReport(snapshot, element) {
+        selectedChartPeriod = "YTD";
+        selectedPositionPeriod = "YTD";
+        document.getElementById("report").hidden = false;
+        const currentValue = snapshot.positions.reduce((sum, position) => sum + position.value, 0);
+        document.getElementById("report-value").textContent = "Current position " + formatCurrency(currentValue, snapshot.currency);
+        const renderChart = () => {
+          const data = snapshot.periods[selectedChartPeriod];
+          const gain = document.getElementById("report-gain");
+          const gainPct = document.getElementById("report-gain-pct");
+          gain.textContent = data.gain === null ? "N/A" : formatCurrency(data.gain, snapshot.currency);
+          gain.style.color = data.gain === null ? "#9da5ad" : data.gain >= 0 ? "#8defc4" : "#f29caf";
+          gainPct.textContent = data.gainPct === null ? "" : formatPercent(data.gainPct);
+          gainPct.style.color = gain.style.color;
+          const canvas = document.getElementById("chart");
+          const empty = document.getElementById("chart-empty");
+          const points = data.points;
+          canvas.hidden = points.length === 0;
+          empty.hidden = points.length > 0;
+          if (!points.length) return;
+          const bounds = canvas.getBoundingClientRect();
+          const width = Math.max(1, bounds.width);
+          const height = Math.max(1, bounds.height);
+          const scale = window.devicePixelRatio || 1;
+          canvas.width = Math.round(width * scale);
+          canvas.height = Math.round(height * scale);
+          const context = canvas.getContext("2d");
+          if (!context) return;
+          context.setTransform(scale, 0, 0, scale, 0, 0);
+          context.clearRect(0, 0, width, height);
+          const left = 58, right = 8, top = 14, bottom = 25;
+          const chartWidth = Math.max(1, width - left - right);
+          const chartHeight = Math.max(1, height - top - bottom);
+          const values = points.map(point => point[1]);
+          let minimum = Math.min(...values), maximum = Math.max(...values);
+          if (minimum === maximum) { minimum -= 1; maximum += 1; }
+          const padding = (maximum - minimum) * 0.08;
+          minimum = Math.max(0, minimum - padding);
+          maximum += padding;
+          const yAt = value => top + (maximum - value) / (maximum - minimum) * chartHeight;
+          context.font = "11px sans-serif";
+          context.textAlign = "right";
+          context.textBaseline = "middle";
+          for (let tick = 0; tick <= 3; tick += 1) {
+            const value = minimum + (maximum - minimum) * tick / 3;
+            const y = yAt(value);
+            context.strokeStyle = "#303638";
+            context.lineWidth = 1;
+            context.beginPath(); context.moveTo(left, y); context.lineTo(width - right, y); context.stroke();
+            context.fillStyle = "#9da5ad";
+            context.fillText(new Intl.NumberFormat(undefined, { style: "currency", currency: snapshot.currency, notation: "compact", maximumFractionDigits: 1 }).format(value), left - 8, y);
+          }
+          context.beginPath();
+          points.forEach((point, index) => {
+            const x = left + (points.length < 2 ? 0 : index / (points.length - 1) * chartWidth);
+            const y = yAt(point[1]);
+            if (index === 0) context.moveTo(x, y); else context.lineTo(x, y);
+          });
+          context.strokeStyle = "#8defc4";
+          context.lineWidth = 2;
+          context.lineJoin = "round";
+          context.lineCap = "round";
+          context.stroke();
+          context.fillStyle = "#9da5ad";
+          context.textAlign = "left";
+          context.textBaseline = "alphabetic";
+          context.fillText(new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(points[0][0] * 1000)), left, height - 4);
+          context.textAlign = "right";
+          context.fillText(new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: points.length > 1 && (points[points.length - 1][0] - points[0][0]) > 300 * 86400 ? "numeric" : undefined }).format(new Date(points[points.length - 1][0] * 1000)), width - right, height - 4);
+        };
+        const renderPositions = () => {
+          makePeriods("position-periods", selectedPositionPeriod, period => {
+            selectedPositionPeriod = period;
+            renderPositions();
+          }, element);
+          const rows = [];
+          snapshot.positions.forEach((position, index) => {
+            const row = element("tr");
+            const heading = element("th"); heading.scope = "row";
+            const holding = element("div", "holding");
+            const swatch = element("span", "swatch"); swatch.style.backgroundColor = palette[index % palette.length];
+            const identity = element("div", "position-identity");
+            identity.append(element("div", "symbol", position.symbol), element("div", "company", position.name), element("div", "shares", formatShares(position.shares) + " shares"));
+            holding.append(swatch, identity); heading.append(holding);
+            const weight = element("td"); weight.append(element("div", "weight", position.weight.toFixed(2) + "%"));
+            const value = element("td"); value.append(element("div", "position-value", formatCurrency(position.value, snapshot.currency)));
+            const pnl = element("td", "pnl-cell");
+            const metric = position.performance[selectedPositionPeriod];
+            pnl.append(element("div", "gain-main", metric.gain === null ? "N/A" : formatCurrency(metric.gain, snapshot.currency)));
+            pnl.append(element("div", "gain-detail", metric.gainPct === null ? "" : formatPercent(metric.gainPct)));
+            if (metric.gain !== null) pnl.style.color = metric.gain >= 0 ? "#8defc4" : "#f29caf";
+            row.append(heading, weight, value, pnl);
+            rows.push(row);
+          });
+          document.getElementById("positions").replaceChildren(...rows);
+        };
+        makePeriods("chart-periods", selectedChartPeriod, period => {
+          selectedChartPeriod = period;
+          makePeriods("chart-periods", selectedChartPeriod, arguments[1], element);
+          renderChart();
+        }, element);
+        redrawChart = renderChart;
+        renderChart();
+        renderPositions();
+      }
+
       window.addEventListener("hashchange", renderSnapshot);
       renderSnapshot();
     })();
