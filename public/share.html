@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex, nofollow">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-E/cKNhHUAZP7xb60uVBxn0XFrRz0ldmqcmgmIsH+XsI='; style-src 'sha256-mTpC9qlZJ9B+FU7eA+z9vabjSYCcJT0rQBwz7mn1Rgw='; base-uri 'none'; form-action 'none'; connect-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-2hEKKPktvfN7OOMEUVuhG8oZDeDxsHoW47LHVZluADU='; style-src 'sha256-mTpC9qlZJ9B+FU7eA+z9vabjSYCcJT0rQBwz7mn1Rgw='; base-uri 'none'; form-action 'none'; connect-src 'none'">
   <title>Portfolio</title>
   <style>
     :root { color-scheme: dark; --background: #111417; --text: #f5f7fa; --muted: #9da5ad; --line: #303638; --accent: #8defc4; }
@@ -107,55 +107,68 @@
           return { name: value.name, date: value.date, positions };
         } catch { return null; }
       }
-      const snapshot = readSnapshot(location.hash.startsWith("#d=") ? location.hash.slice(3) : "");
-      if (!snapshot) return;
-      const palette = ["#8defc4", "#75a9ff", "#f4cb69", "#f29caf", "#bca9f0", "#61ccd4", "#b8ce76", "#e8a77e"];
-      const element = (tag, className, text) => {
-        const node = document.createElement(tag);
-        if (className) node.className = className;
-        if (text !== undefined) node.textContent = text;
-        return node;
-      };
-      document.title = snapshot.name + " | Portfolio";
-      document.getElementById("name").textContent = snapshot.name;
-      const date = document.getElementById("date");
-      date.dateTime = snapshot.date;
-      date.textContent = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(snapshot.date));
-      document.getElementById("count").textContent = String(snapshot.positions.length);
-      let cumulative = 0;
-      const segments = [];
-      const rows = [];
-      snapshot.positions.forEach((position, index) => {
-        const color = palette[index % palette.length];
-        const end = Math.min(100, cumulative + position.weight);
-        segments.push(color + " " + cumulative + "% " + end + "%");
-        cumulative = end;
-        const row = element("tr");
-        const heading = element("th");
-        heading.scope = "row";
-        const holding = element("div", "holding");
-        const swatch = element("span", "swatch");
-        swatch.style.backgroundColor = color;
-        const identity = element("div");
-        identity.append(element("div", "symbol", position.symbol), element("div", "company", position.name));
-        holding.append(swatch, identity);
-        heading.append(holding);
-        const allocation = element("td");
-        allocation.append(element("div", "weight", position.weight.toFixed(2) + "%"));
-        const bar = element("div", "bar");
-        bar.setAttribute("aria-hidden", "true");
-        const fill = element("div", "bar-fill");
-        fill.style.width = position.weight + "%";
-        fill.style.backgroundColor = color;
-        bar.append(fill);
-        allocation.append(bar);
-        row.append(heading, allocation);
-        rows.push(row);
-      });
-      document.getElementById("positions").replaceChildren(...rows);
-      document.getElementById("ring").style.setProperty("--segments", segments.join(", "));
-      document.getElementById("error").hidden = true;
-      document.getElementById("portfolio").hidden = false;
+      function renderSnapshot() {
+        document.title = "Portfolio";
+        document.getElementById("name").textContent = "Portfolio";
+        document.getElementById("date").dateTime = "";
+        document.getElementById("date").textContent = "";
+        document.getElementById("count").textContent = "";
+        document.getElementById("positions").replaceChildren();
+        document.getElementById("ring").style.setProperty("--segments", "#303638 0% 100%");
+        document.getElementById("error").hidden = false;
+        document.getElementById("portfolio").hidden = true;
+        const snapshot = readSnapshot(location.hash.startsWith("#d=") ? location.hash.slice(3) : "");
+        if (!snapshot) return;
+        const palette = ["#8defc4", "#75a9ff", "#f4cb69", "#f29caf", "#bca9f0", "#61ccd4", "#b8ce76", "#e8a77e"];
+        const element = (tag, className, text) => {
+          const node = document.createElement(tag);
+          if (className) node.className = className;
+          if (text !== undefined) node.textContent = text;
+          return node;
+        };
+        document.title = snapshot.name + " | Portfolio";
+        document.getElementById("name").textContent = snapshot.name;
+        const date = document.getElementById("date");
+        date.dateTime = snapshot.date;
+        date.textContent = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(snapshot.date));
+        document.getElementById("count").textContent = String(snapshot.positions.length);
+        let cumulative = 0;
+        const segments = [];
+        const rows = [];
+        snapshot.positions.forEach((position, index) => {
+          const color = palette[index % palette.length];
+          const end = Math.min(100, cumulative + position.weight);
+          segments.push(color + " " + cumulative + "% " + end + "%");
+          cumulative = end;
+          const row = element("tr");
+          const heading = element("th");
+          heading.scope = "row";
+          const holding = element("div", "holding");
+          const swatch = element("span", "swatch");
+          swatch.style.backgroundColor = color;
+          const identity = element("div");
+          identity.append(element("div", "symbol", position.symbol), element("div", "company", position.name));
+          holding.append(swatch, identity);
+          heading.append(holding);
+          const allocation = element("td");
+          allocation.append(element("div", "weight", position.weight.toFixed(2) + "%"));
+          const bar = element("div", "bar");
+          bar.setAttribute("aria-hidden", "true");
+          const fill = element("div", "bar-fill");
+          fill.style.width = position.weight + "%";
+          fill.style.backgroundColor = color;
+          bar.append(fill);
+          allocation.append(bar);
+          row.append(heading, allocation);
+          rows.push(row);
+        });
+        document.getElementById("positions").replaceChildren(...rows);
+        document.getElementById("ring").style.setProperty("--segments", segments.join(", "));
+        document.getElementById("error").hidden = true;
+        document.getElementById("portfolio").hidden = false;
+      }
+      window.addEventListener("hashchange", renderSnapshot);
+      renderSnapshot();
     })();
   </script>
 </body>
