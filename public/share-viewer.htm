@@ -21,22 +21,25 @@
     .brand-mark span:nth-child(3) { height: 21px; }
     .summary { display: grid; grid-template-columns: minmax(0, 1fr) 196px; align-items: center; gap: 32px; padding: 36px 0; }
     .report { border-top: 1px solid var(--line); padding: 24px 0 32px; }
-    .report-heading, .positions-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; }
-    .report-heading { margin-bottom: 12px; }
-    .report-heading .eyebrow { margin-bottom: 6px; }
-    .report-gain { display: flex; align-items: baseline; gap: 8px; font-size: 19px; font-variant-numeric: tabular-nums; }
+    .report-heading { display: block; margin-bottom: 16px; }
+    .report-gain { display: flex; align-items: baseline; gap: 8px; font-size: 15px; font-variant-numeric: tabular-nums; }
     .report-gain strong { font-weight: 600; }
-    .report-gain span, .report-value { color: var(--muted); font-size: 13px; }
+    .report-gain span { color: var(--muted); font-size: 13px; }
+    .report-value { color: var(--text); font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; margin: 0 0 3px; }
     .chart-wrap { min-height: 220px; position: relative; margin: 0; }
     canvas { display: block; width: 100%; height: 220px; }
     .chart-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; }
-    .periods { min-width: 0; margin: 0; display: flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 8px; }
-    .period-options { width: 100%; display: flex; justify-content: space-between; gap: 4px; }
-    .period-button { min-width: 46px; padding: 6px 9px; border: 0; border-radius: 5px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+    .periods { min-width: 0; max-width: 100%; margin: 0; display: block; padding: 0; border: 0; }
+    .period-options { width: 100%; display: flex; justify-content: flex-start; gap: 4px; }
+    .period-button { min-width: 38px; padding: 5px 9px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
     .period-button[aria-pressed="true"] { background: #303638; color: var(--text); }
-    .positions-heading { align-items: center; margin: 24px 0 16px; }
+    .positions-heading { margin: 24px 0 8px; }
     .positions-heading h2 { margin: 0; font-size: 17px; font-weight: 600; }
-    #position-periods { flex: 0 1 auto; }
+    #position-periods { margin-bottom: 12px; }
+    .sort-button { display: inline-flex; align-items: center; justify-content: flex-end; gap: 5px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: inherit; cursor: pointer; }
+    .sort-arrow { color: var(--muted); font-size: 12px; }
+    .sort-button[aria-pressed="true"] { color: var(--text); }
+    .sort-button[aria-pressed="true"] .sort-arrow { color: var(--text); }
     #columns.is-report th:nth-child(2), #columns.is-report th:nth-child(3) { text-align: right; }
     #columns.is-report th:nth-child(2) { width: 80px; }
     #columns.is-report th:nth-child(3) { width: 140px; }
@@ -62,6 +65,7 @@
     .shares { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
     .weight { font-size: 17px; font-variant-numeric: tabular-nums; }
     .position-value, .gain-main { font-size: 14px; font-variant-numeric: tabular-nums; }
+    .position-unit-price { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
     .gain-main { font-weight: 500; }
     .gain-detail { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
     .bar { width: 76px; height: 3px; background: #303638; margin: 8px 0 0 auto; }
@@ -75,11 +79,9 @@
       .summary { grid-template-columns: minmax(0, 1fr) 112px; gap: 16px; padding: 28px 0; }
       h1 { font-size: 26px; }
       .report { padding-top: 20px; }
-      .report-heading, .positions-heading { align-items: flex-start; flex-direction: column; }
-      .positions-heading { gap: 10px; }
-      #position-periods { align-self: stretch; }
-      .periods { justify-content: space-between; gap: 1px; }
-      .period-button { min-width: 0; flex: 1; padding: 6px 3px; font-size: 11px; }
+      .report-value { font-size: 25px; }
+      .period-options { gap: 1px; }
+      .period-button { min-width: 0; padding: 5px 7px; font-size: 11px; }
       .chart-wrap, canvas { height: 190px; min-height: 190px; }
       #columns.is-report th:nth-child(2) { width: 56px; }
       #columns.is-report th:nth-child(3) { width: 92px; }
@@ -87,7 +89,7 @@
       tbody th, tbody td { padding: 13px 0; }
       .holding { gap: 7px; padding-right: 6px; }
       .symbol { font-size: 12px; }
-      .company, .shares, .gain-detail { font-size: 10px; }
+      .company, .shares, .gain-detail, .position-unit-price { font-size: 10px; }
       .position-value, .gain-main, .weight { font-size: 12px; }
       .bar { width: 48px; }
       .ring { width: 112px; height: 112px; }
@@ -122,11 +124,8 @@
       </div>
       <section id="report" class="report" hidden>
         <div class="report-heading">
-          <div>
-            <p class="eyebrow">PORTFOLIO GROWTH</p>
-            <div class="report-gain"><strong id="report-gain"></strong><span id="report-gain-pct"></span></div>
-          </div>
           <p class="report-value" id="report-value"></p>
+          <div class="report-gain"><strong id="report-gain"></strong><span id="report-gain-pct"></span></div>
         </div>
         <figure class="chart-wrap">
           <canvas id="chart">Portfolio value over time.</canvas>
@@ -138,11 +137,11 @@
         </fieldset>
         <div class="positions-heading">
           <h2>Positions</h2>
-          <fieldset id="position-periods" class="periods">
-            <legend class="visually-hidden">Position profit and loss period</legend>
-            <div id="position-period-buttons" class="period-options"></div>
-          </fieldset>
         </div>
+        <fieldset id="position-periods" class="periods">
+          <legend class="visually-hidden">Position profit and loss period</legend>
+          <div id="position-period-buttons" class="period-options"></div>
+        </fieldset>
       </section>
       <table aria-label="Portfolio allocation percentages">
         <thead><tr id="columns"><th scope="col">Holding</th><th scope="col">Weight</th></tr></thead>
