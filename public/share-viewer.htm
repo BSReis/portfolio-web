@@ -147,6 +147,7 @@
     (function () {
       "use strict";
       const periods = ["1D", "1W", "1M", "YTD", "1Y", "5Y", "Max"];
+      const palette = ["#8defc4", "#75a9ff", "#f4cb69", "#f29caf", "#bca9f0", "#61ccd4", "#b8ce76", "#e8a77e"];
       let redrawChart = () => {};
       window.addEventListener("resize", () => redrawChart());
 
@@ -193,7 +194,7 @@
       }
 
       function readSnapshot(encoded) {
-        if (!encoded || encoded.length > 12000) return null;
+        if (!encoded || encoded.length > 60000) return null;
         try {
           let value = encoded.startsWith("2.") ? expandCompact(decodeCompact(encoded.slice(2))) : JSON.parse(decodeURIComponent(encoded));
           if (!value || ![1, 2].includes(value.v) || typeof value.name !== "string" || !value.name.trim() || value.name.length > 80 ||
@@ -262,7 +263,6 @@
         document.getElementById("portfolio").hidden = true;
         const snapshot = readSnapshot(location.hash.startsWith("#d=") ? location.hash.slice(3) : "");
         if (!snapshot) { redrawChart = () => {}; return; }
-        const palette = ["#8defc4", "#75a9ff", "#f4cb69", "#f29caf", "#bca9f0", "#61ccd4", "#b8ce76", "#e8a77e"];
         const element = (tag, className, text) => {
           const node = document.createElement(tag);
           if (className) node.className = className;
@@ -318,7 +318,10 @@
           rows.push(row);
         });
         document.getElementById("positions").replaceChildren(...rows);
-        document.getElementById("columns").className = snapshot.v === 2 ? "is-report" : "";
+        const columns = document.getElementById("columns");
+        columns.className = snapshot.v === 2 ? "is-report" : "";
+        const headings = snapshot.v === 2 ? ["Holding", "Weight", "Position", "P/L"] : ["Holding", "Weight"];
+        columns.replaceChildren(...headings.map((label) => element("th", "", label)));
         document.getElementById("ring").style.setProperty("--segments", segments.join(", "));
         document.getElementById("error").hidden = true;
         document.getElementById("portfolio").hidden = false;
@@ -443,11 +446,12 @@
           });
           document.getElementById("positions").replaceChildren(...rows);
         };
-        makePeriods("chart-periods", selectedChartPeriod, period => {
+        const renderChartPeriods = () => makePeriods("chart-periods", selectedChartPeriod, period => {
           selectedChartPeriod = period;
-          makePeriods("chart-periods", selectedChartPeriod, arguments[1], element);
+          renderChartPeriods();
           renderChart();
         }, element);
+        renderChartPeriods();
         redrawChart = renderChart;
         renderChart();
         renderPositions();
