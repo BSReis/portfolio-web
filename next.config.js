@@ -78,12 +78,12 @@ const nextConfig = {
 
     return config;
   },
-  // Rewrite every non-API, non-_next path to the index page so that
+  // Rewrite application paths to the index page so that
   // React Navigation can handle the URL client-side after a hard refresh.
   async rewrites() {
     return [
       {
-        source: '/:path((?!api|_next|favicon|public).*)',
+        source: String.raw`/:path((?!api|_next|favicon|public|share(?:\.html)?(?:/|$)).*)`,
         destination: '/',
       },
     ];
