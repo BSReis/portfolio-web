@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex, nofollow">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-d+XcGvYeJPJM682a8ApYX+MPN+NzRNSMWbO0tbBTeGc='; style-src 'sha256-jonRau049m1xS6fgCGRGcpRq5ut7wqxypRRX8lmRTd0='; base-uri 'none'; form-action 'none'; connect-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-01xKU6fuqXb1CEnjyEuNf0xQ/GsSg0aNANBiQRBKgOE='; style-src 'sha256-iBIWw+7cprw5c2U2feDUgzOLVk1XsD5o/MdLwECXabI='; base-uri 'none'; form-action 'none'; connect-src 'none'">
   <title>Portfolio</title>
   <style>
     :root { color-scheme: dark; --background: #0f0f0f; --text: #f8fafc; --muted: #64748b; --line: #1e293b; --accent: #6366f1; --positive: #22c55e; --negative: #ef4444; }
     * { box-sizing: border-box; letter-spacing: 0; }
     [hidden] { display: none; }
-    body { margin: 0; color: var(--text); background: var(--background); font: 15px/1.5 "Avenir Next", "Segoe UI", sans-serif; }
+    body { margin: 0; color: var(--text); background: var(--background); font: 15px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background-image: linear-gradient(#ffffff02 1px, transparent 1px); background-size: 100% 32px; }
     main { width: min(100% - 48px, 840px); margin: 0 auto; padding: 40px 0 56px; }
     .brand { display: flex; align-items: center; gap: 10px; padding-bottom: 24px; border-bottom: 1px solid var(--line); font-weight: 600; }
@@ -29,6 +29,7 @@
     .chart-wrap { min-height: 220px; position: relative; margin: 0; }
     canvas { display: block; width: 100%; height: 220px; }
     .chart-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; }
+    .chart-empty[hidden] { display: none; }
     .periods { min-width: 0; max-width: 100%; margin: 0; display: block; padding: 0; border: 0; }
     .period-options { width: 100%; display: flex; justify-content: flex-start; gap: 4px; }
     .period-button { min-width: 38px; padding: 5px 9px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
@@ -45,15 +46,14 @@
     #columns.is-report th:nth-child(2) { width: 80px; }
     #columns.is-report th:nth-child(3) { width: 140px; }
     #columns.is-report th:last-child { width: 150px; }
-    #positions td:nth-child(2), #positions td:nth-child(3), #positions td:nth-child(4), #total-row td { text-align: right; }
+    #positions td:nth-child(2), #positions td:nth-child(3), #positions td:nth-child(4) { text-align: right; }
     .eyebrow { color: var(--accent); font-size: 12px; font-weight: 600; margin: 0 0 12px; }
-    h1 { font: 400 36px/1.2 Georgia, serif; margin: 0 0 18px; overflow-wrap: anywhere; }
+    h1 { font: inherit; font-size: 36px; font-weight: 600; line-height: 1.2; margin: 0 0 18px; overflow-wrap: anywhere; }
     time { color: var(--muted); font-size: 13px; }
     .ring { width: 196px; height: 196px; border-radius: 50%; background: var(--line); display: grid; place-items: center; position: relative; overflow: hidden; }
     .ring canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
     .ring::before { content: ""; position: absolute; inset: 18px; z-index: 1; border-radius: 50%; background: var(--background); pointer-events: none; }
-    .ring-label { position: relative; text-align: center; }
-    .ring-label { z-index: 2; }
+    .ring-label { position: relative; z-index: 2; text-align: center; }
     .ring-number { display: block; font-size: 32px; font-weight: 600; font-variant-numeric: tabular-nums; }
     .ring-caption { display: block; color: var(--muted); font-size: 12px; }
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
@@ -162,7 +162,6 @@
       <table aria-label="Portfolio allocation percentages">
         <thead><tr id="columns"><th scope="col">Holding</th><th scope="col">Weight</th></tr></thead>
         <tbody id="positions"></tbody>
-        <tfoot><tr id="total-row"><th scope="row">Total</th><td>100.00%</td></tr></tfoot>
       </table>
     </section>
   </main>
@@ -372,11 +371,6 @@
           heading.scope = "col";
           return heading;
         }));
-        const totalRow = document.getElementById("total-row");
-        const totalValue = snapshot.positions.reduce((sum, position) => sum + (position.value ?? 0), 0);
-        totalRow.replaceChildren(element("th", "", "Total"), element("td", "", "100.00%"));
-        if (snapshot.v === 2)
-          totalRow.append(element("td", "position-value", formatCurrency(totalValue, snapshot.currency)), element("td", ""));
         redrawRing = () => drawRing(snapshot.positions);
         drawRing(snapshot.positions);
         document.getElementById("error").hidden = true;
@@ -563,17 +557,6 @@
             rows.push(row);
           });
           document.getElementById("positions").replaceChildren(...rows);
-          const reportPeriod = snapshot.periods[selectedPositionPeriod];
-          const pnlTotal = reportPeriod.gain === null
-            ? "N/A"
-            : formatCurrency(reportPeriod.gain, snapshot.currency) +
-              (reportPeriod.gainPct === null ? "" : " " + formatPercent(reportPeriod.gainPct));
-          document.getElementById("total-row").replaceChildren(
-            element("th", "", "Total"),
-            element("td", "", "100.00%"),
-            element("td", "position-value", formatCurrency(currentValue, snapshot.currency)),
-            element("td", "gain-main", pnlTotal),
-          );
         };
         const renderChartPeriods = () => makePeriods("chart-period", selectedChartPeriod, period => {
           selectedChartPeriod = period;
