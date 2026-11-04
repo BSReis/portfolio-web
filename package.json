@@ -19,6 +19,7 @@
     "expo-asset": "^56.0.14",
     "expo-font": "^56.0.5",
     "expo-modules-core": "^56.0.12",
+    "lz-string": "^1.5.0",
     "next": "^15.3.2",
     "react": "19.1.0",
     "react-dom": "19.1.0",
