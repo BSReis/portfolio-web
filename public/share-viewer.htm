@@ -320,7 +320,7 @@
             const metric = position.performance[selectedPositionPeriod];
             pnl.append(element("div", "gain-main", metric.gain === null ? "N/A" : formatCurrency(metric.gain, snapshot.currency)));
             pnl.append(element("div", "gain-detail", metric.gainPct === null ? "" : formatPercent(metric.gainPct)));
-            if (metric.gain !== null) pnl.style.color = metric.gain >= 0 ? "#8defc4" : "#f29caf";
+            if (metric.gain !== null) pnl.style.color = metric.gain >= 0 ? "#22c55e" : "#ef4444";
             row.append(heading, allocation, positionValue, pnl);
           } else {
             row.append(heading, allocation);
