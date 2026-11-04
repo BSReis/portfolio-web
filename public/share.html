@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-E/cKNhHUAZP7xb60uVBxn0XFrRz0ldmqcmgmIsH+XsI='; style-src 'sha256-mTpC9qlZJ9B+FU7eA+z9vabjSYCcJT0rQBwz7mn1Rgw='; base-uri 'none'; form-action 'none'; connect-src 'none'">
+  <title>Portfolio</title>
+  <style>
+    :root { color-scheme: dark; --background: #111417; --text: #f5f7fa; --muted: #9da5ad; --line: #303638; --accent: #8defc4; }
+    * { box-sizing: border-box; letter-spacing: 0; }
+    [hidden] { display: none; }
+    body { margin: 0; color: var(--text); background: var(--background); font: 15px/1.5 "Avenir Next", "Segoe UI", sans-serif; }
+    body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background-image: linear-gradient(#ffffff02 1px, transparent 1px); background-size: 100% 32px; }
+    main { width: min(100% - 48px, 840px); margin: 0 auto; padding: 40px 0 56px; }
+    .brand { display: flex; align-items: center; gap: 10px; padding-bottom: 24px; border-bottom: 1px solid var(--line); font-weight: 600; }
+    .brand-mark { width: 21px; height: 21px; display: grid; grid-template-columns: repeat(3, 5px); align-items: end; gap: 3px; }
+    .brand-mark span { display: block; background: var(--accent); height: 9px; }
+    .brand-mark span:nth-child(2) { height: 15px; }
+    .brand-mark span:nth-child(3) { height: 21px; }
+    .summary { display: grid; grid-template-columns: minmax(0, 1fr) 196px; align-items: center; gap: 32px; padding: 36px 0; }
+    .eyebrow { color: var(--accent); font-size: 12px; font-weight: 600; margin: 0 0 12px; }
+    h1 { font: 400 36px/1.2 Georgia, serif; margin: 0 0 18px; overflow-wrap: anywhere; }
+    time { color: var(--muted); font-size: 13px; }
+    .ring { --segments: #303638 0% 100%; width: 196px; height: 196px; border-radius: 50%; background: conic-gradient(var(--segments)); display: grid; place-items: center; position: relative; }
+    .ring::before { content: ""; position: absolute; inset: 18px; border-radius: 50%; background: var(--background); }
+    .ring-label { position: relative; text-align: center; }
+    .ring-number { display: block; font-size: 32px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .ring-caption { display: block; color: var(--muted); font-size: 12px; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    thead th { color: var(--muted); font-size: 12px; font-weight: 500; padding: 0 0 14px; text-align: left; border-bottom: 1px solid var(--line); }
+    th:last-child, td:last-child { width: 100px; text-align: right; }
+    tbody th, tbody td { border-bottom: 1px solid var(--line); padding: 18px 0; vertical-align: middle; }
+    tbody th { font-weight: 400; text-align: left; }
+    .holding { display: flex; align-items: flex-start; gap: 12px; min-width: 0; padding-right: 16px; }
+    .swatch { display: block; width: 8px; height: 8px; border-radius: 2px; margin-top: 7px; flex: 0 0 8px; }
+    .symbol { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+    .company { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+    .weight { font-size: 17px; font-variant-numeric: tabular-nums; }
+    .bar { width: 76px; height: 3px; background: #303638; margin: 8px 0 0 auto; }
+    .bar-fill { height: 100%; }
+    tfoot th, tfoot td { padding-top: 20px; font-weight: 500; text-align: left; font-variant-numeric: tabular-nums; }
+    .error { padding: 56px 0; }
+    .error p { color: var(--muted); }
+    @media (max-width: 520px) {
+      main { width: calc(100% - 32px); padding-top: 24px; }
+      .summary { grid-template-columns: minmax(0, 1fr) 112px; gap: 16px; padding: 28px 0; }
+      h1 { font-size: 26px; }
+      .ring { width: 112px; height: 112px; }
+      .ring::before { inset: 10px; }
+      .ring-number { font-size: 25px; }
+      .ring-caption { font-size: 10px; }
+      .eyebrow { font-size: 11px; }
+    }
+    @media print {
+      :root { --background: #fff; --text: #111417; --muted: #515960; --line: #d3d8da; color-scheme: light; }
+      body::before { display: none; }
+      main { width: 100%; padding: 0; }
+      .ring, .swatch, .bar-fill { print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="brand"><span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>Portfolio</header>
+    <section id="error" class="error" aria-live="polite">
+      <h1>Portfolio unavailable</h1>
+      <p>This link is incomplete or invalid.</p>
+    </section>
+    <section id="portfolio" hidden>
+      <div class="summary">
+        <div>
+          <p class="eyebrow">ALLOCATION SNAPSHOT</p>
+          <h1 id="name">Portfolio</h1>
+          <time id="date"></time>
+        </div>
+        <div class="ring" id="ring" aria-hidden="true"><div class="ring-label"><span id="count" class="ring-number"></span><span class="ring-caption">positions</span></div></div>
+      </div>
+      <table aria-label="Portfolio allocation percentages">
+        <thead><tr><th scope="col">Holding</th><th scope="col">Weight</th></tr></thead>
+        <tbody id="positions"></tbody>
+        <tfoot><tr><th scope="row">Total</th><td>100.00%</td></tr></tfoot>
+      </table>
+    </section>
+  </main>
+  <script>
+    (function () {
+      "use strict";
+      function readSnapshot(encoded) {
+        if (!encoded || encoded.length > 12000) return null;
+        try {
+          const value = JSON.parse(decodeURIComponent(encoded));
+          if (!value || value.v !== 1 || typeof value.name !== "string" || !value.name.trim() || value.name.length > 80 ||
+            typeof value.date !== "string" || !Number.isFinite(Date.parse(value.date)) ||
+            !Array.isArray(value.positions) || !value.positions.length || value.positions.length > 100) return null;
+          const positions = [];
+          for (const position of value.positions) {
+            if (!position || typeof position.symbol !== "string" || !position.symbol.trim() || position.symbol.length > 40 ||
+              typeof position.name !== "string" || !position.name.trim() || position.name.length > 120 ||
+              typeof position.weight !== "number" || !Number.isFinite(position.weight) || position.weight < 0 || position.weight > 100 ||
+              Math.abs(position.weight * 100 - Math.round(position.weight * 100)) > 0.000001) return null;
+            positions.push({ symbol: position.symbol, name: position.name, weight: position.weight });
+          }
+          if (Math.abs(positions.reduce((sum, position) => sum + position.weight, 0) - 100) > 0.001 ||
+            new Set(positions.map((position) => position.symbol)).size !== positions.length) return null;
+          return { name: value.name, date: value.date, positions };
+        } catch { return null; }
+      }
+      const snapshot = readSnapshot(location.hash.startsWith("#d=") ? location.hash.slice(3) : "");
+      if (!snapshot) return;
+      const palette = ["#8defc4", "#75a9ff", "#f4cb69", "#f29caf", "#bca9f0", "#61ccd4", "#b8ce76", "#e8a77e"];
+      const element = (tag, className, text) => {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text !== undefined) node.textContent = text;
+        return node;
+      };
+      document.title = snapshot.name + " | Portfolio";
+      document.getElementById("name").textContent = snapshot.name;
+      const date = document.getElementById("date");
+      date.dateTime = snapshot.date;
+      date.textContent = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(snapshot.date));
+      document.getElementById("count").textContent = String(snapshot.positions.length);
+      let cumulative = 0;
+      const segments = [];
+      const rows = [];
+      snapshot.positions.forEach((position, index) => {
+        const color = palette[index % palette.length];
+        const end = Math.min(100, cumulative + position.weight);
+        segments.push(color + " " + cumulative + "% " + end + "%");
+        cumulative = end;
+        const row = element("tr");
+        const heading = element("th");
+        heading.scope = "row";
+        const holding = element("div", "holding");
+        const swatch = element("span", "swatch");
+        swatch.style.backgroundColor = color;
+        const identity = element("div");
+        identity.append(element("div", "symbol", position.symbol), element("div", "company", position.name));
+        holding.append(swatch, identity);
+        heading.append(holding);
+        const allocation = element("td");
+        allocation.append(element("div", "weight", position.weight.toFixed(2) + "%"));
+        const bar = element("div", "bar");
+        bar.setAttribute("aria-hidden", "true");
+        const fill = element("div", "bar-fill");
+        fill.style.width = position.weight + "%";
+        fill.style.backgroundColor = color;
+        bar.append(fill);
+        allocation.append(bar);
+        row.append(heading, allocation);
+        rows.push(row);
+      });
+      document.getElementById("positions").replaceChildren(...rows);
+      document.getElementById("ring").style.setProperty("--segments", segments.join(", "));
+      document.getElementById("error").hidden = true;
+      document.getElementById("portfolio").hidden = false;
+    })();
+  </script>
+</body>
+</html>

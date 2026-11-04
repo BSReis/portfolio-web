@@ -9,7 +9,8 @@ import { RootStackParamList } from '../../App';
 import { useSettings, Currency } from '../context/SettingsContext';
 import { usePortfolio } from '../context/PortfolioContext';
 import { BrokerType } from '../utils/importBroker';
-import { encodePortfolioShare } from '../utils/sharePortfolio';
+import { createPortfolioSnapshot, portfolioShareUrl } from '../utils/sharePortfolio';
+import { getStockQuote, effectivePrice } from '../services/api';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
@@ -33,9 +34,10 @@ export default function SettingsScreen({ navigation }: Props) {
     setDividendTaxRate,
     colorScheme,
     setColorScheme,
-    hideValues,
+    getRateFor,
+    ratesInEur,
   } = useSettings();
-  const { exportPortfolio, importPortfolio, importBrokerCSV, clearPortfolio, holdings, transactions, activePortfolioName } = usePortfolio();
+  const { exportPortfolio, importPortfolio, importBrokerCSV, clearPortfolio, holdings, activePortfolioName } = usePortfolio();
 
   const [draftFmp, setDraftFmp] = useState(fmpKey);
   const [draftFh, setDraftFh] = useState(fhKey);
@@ -48,6 +50,7 @@ export default function SettingsScreen({ navigation }: Props) {
   const [brokerBusy, setBrokerBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [shareLinkCopied, setShareLinkCopied] = useState(false);
+  const [shareBusy, setShareBusy] = useState(false);
   const [apiInfo, setApiInfo] = useState<null | { title: string; desc: string; url: string; urlLabel: string }>(null);
 
   const API_INFO = {
@@ -121,28 +124,42 @@ export default function SettingsScreen({ navigation }: Props) {
     finally { setBackupBusy(false); }
   };
 
-  const handleShareLink = () => {
+  const handleShareLink = async () => {
+    setShareBusy(true);
     try {
-      const encoded = encodePortfolioShare(activePortfolioName, holdings, transactions, hideValues);
-      const url = `${window.location.origin}/share?d=${encoded}`;
+      const positions = await Promise.all(holdings.map(async (holding) => {
+        const cash = holding.symbol.startsWith('CASH_');
+        const quote = cash ? null : await getStockQuote(holding.symbol);
+        const nativeCurrency = cash ? holding.currency ?? holding.symbol.slice(5) : quote?.currency;
+        if (!nativeCurrency || (ratesInEur[nativeCurrency] ?? 0) <= 0 || (ratesInEur[currency] ?? 0) <= 0)
+          throw new Error('Current prices and exchange rates are required for every position.');
+        let price = cash ? 1 : Number.NaN;
+        if (!cash && quote) price = effectivePrice(quote);
+        return { symbol: holding.symbol, name: holding.name,
+          value: holding.shares * price * getRateFor(nativeCurrency) };
+      }));
+      const snapshot = createPortfolioSnapshot(activePortfolioName, positions);
+      const url = portfolioShareUrl(`${window.location.origin}/share.html`, snapshot);
       if (navigator.clipboard) {
-        navigator.clipboard.writeText(url).then(() => {
-          setShareLinkCopied(true);
-          setTimeout(() => setShareLinkCopied(false), 3000);
-        });
+        await navigator.clipboard.writeText(url);
       } else {
-        // Fallback for older browsers
         const ta = document.createElement('textarea');
         ta.value = url;
         document.body.appendChild(ta);
         ta.select();
-        document.execCommand('copy');
+        const copied = document.execCommand('copy');
         document.body.removeChild(ta);
-        setShareLinkCopied(true);
-        setTimeout(() => setShareLinkCopied(false), 3000);
+        if (!copied) {
+          window.prompt('Portfolio share link', url);
+          return;
+        }
       }
-    } catch {
-      Alert.alert('Error', 'Could not generate share link.');
+      setShareLinkCopied(true);
+      setTimeout(() => setShareLinkCopied(false), 3000);
+    } catch (error) {
+      Alert.alert('Could not share portfolio', error instanceof Error ? error.message : 'Please try again.');
+    } finally {
+      setShareBusy(false);
     }
   };
 
@@ -420,12 +437,9 @@ export default function SettingsScreen({ navigation }: Props) {
       </TouchableOpacity>
 
       <Text style={[styles.section, { marginTop: 28 }]}>Share portfolio</Text>
-      <Text style={styles.hint}>
-        Generate a shareable link with your current portfolio. Anyone with the link can view your holdings, chart and performance — no account needed.
-      </Text>
-      <TouchableOpacity style={[styles.backupBtn, shareLinkCopied && { backgroundColor: '#16a34a' }]} onPress={handleShareLink}>
+      <TouchableOpacity style={[styles.backupBtn, shareLinkCopied && { backgroundColor: '#16a34a' }, shareBusy && { opacity: 0.6 }]} onPress={() => { void handleShareLink(); }} disabled={shareBusy} accessibilityLabel="Copy portfolio percentage snapshot link">
         <Ionicons name={shareLinkCopied ? 'checkmark-circle-outline' : 'link-outline'} size={18} color="#f8fafc" />
-        <Text style={styles.backupBtnText}>{shareLinkCopied ? 'Link copied to clipboard!' : 'Copy share link'}</Text>
+        <Text style={styles.backupBtnText}>{shareBusy ? 'Preparing link...' : shareLinkCopied ? 'Link copied to clipboard!' : 'Copy share link'}</Text>
       </TouchableOpacity>
 
       <Text style={[styles.section, { marginTop: 28 }]}>Portfolio backup</Text>
