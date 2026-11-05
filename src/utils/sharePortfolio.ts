@@ -151,7 +151,9 @@ export function decodePortfolioShare(
   if (encoded.length > MAX_LINK_LENGTH) return null;
   try {
     if (encoded.startsWith("1.")) {
-      const decompressed = LZString.decompressFromEncodedURIComponent(encoded.slice(2));
+      const decompressed = LZString.decompressFromEncodedURIComponent(
+        encoded.slice(2),
+      );
       if (!decompressed) return null;
       return readPortfolioSnapshot(JSON.parse(decompressed));
     }
