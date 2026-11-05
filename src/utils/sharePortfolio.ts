@@ -192,29 +192,6 @@ export function decodePortfolioShare(
   }
 }
 
-export function portfolioShareUrl(
-  pageUrl: string,
-  snapshot: PortfolioSnapshot,
-): string {
-  let url: URL;
-  try {
-    url = new URL(pageUrl.trim());
-  } catch {
-    throw new Error("Set the public share page URL in Settings first.");
-  }
-  if (
-    !["https:", "http:"].includes(url.protocol) ||
-    url.username ||
-    url.password
-  )
-    throw new Error("Use an HTTP or HTTPS share page without credentials.");
-  url.search = "";
-  url.hash = `d=${encodePortfolioShare(snapshot)}`;
-  if (url.toString().length > MAX_LINK_LENGTH)
-    throw new Error("The portfolio is too large for a share link.");
-  return url.toString();
-}
-
 export async function createStoredPortfolioShareUrl(
   pageUrl: string,
   snapshot: PortfolioSnapshot,
