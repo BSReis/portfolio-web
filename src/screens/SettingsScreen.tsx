@@ -197,10 +197,16 @@ export default function SettingsScreen({ navigation }: Props) {
           };
         }),
       );
-      const totalValue = positions.reduce((sum, position) => sum + position.value, 0);
+      const totalValue = positions.reduce(
+        (sum, position) => sum + position.value,
+        0,
+      );
       const totalCost = holdings.reduce(
         (sum, holding) =>
-          sum + holding.avgPrice * getRateFor(holding.currency ?? "USD") * holding.shares,
+          sum +
+          holding.avgPrice *
+            getRateFor(holding.currency ?? "USD") *
+            holding.shares,
         0,
       );
       const totalReturnPct =
