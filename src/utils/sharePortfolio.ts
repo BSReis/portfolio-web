@@ -185,3 +185,43 @@ export function portfolioShareUrl(
     throw new Error("The portfolio is too large for a share link.");
   return url.toString();
 }
+
+export async function createStoredPortfolioShareUrl(
+  pageUrl: string,
+  snapshot: PortfolioSnapshot,
+  request: typeof fetch = fetch,
+): Promise<string> {
+  let page: URL;
+  try {
+    page = new URL(pageUrl.trim());
+  } catch {
+    throw new Error("Set the public share page URL in Settings first.");
+  }
+  if (!["https:", "http:"].includes(page.protocol) || page.username || page.password)
+    throw new Error("Use an HTTP or HTTPS share page without credentials.");
+  let response: Response;
+  try {
+    response = await request(new URL("/api/share", page).toString(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ payload: encodePortfolioShare(snapshot) }),
+    });
+  } catch {
+    throw new Error("Could not create a short share link. Check the web share service.");
+  }
+  if (!response.ok)
+    throw new Error("Could not create a short share link. Please try again.");
+  let result: unknown;
+  try {
+    result = await response.json();
+  } catch {
+    throw new Error("The web share service returned an invalid response.");
+  }
+  const id = (result as { id?: unknown } | null)?.id;
+  if (typeof id !== "string" || !/^[a-f0-9]{32}$/.test(id))
+    throw new Error("The web share service returned an invalid link ID.");
+  page.search = "";
+  page.hash = "";
+  page.searchParams.set("id", id);
+  return page.toString();
+}

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex, nofollow">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Cn/vPxDap43baIYuawsPfQpMemh9qJDM5LWrtSqUAcc=' 'sha384-0d+Gr7vM4Drod8E3hXKgciWJSWbjD/opKLLygI9ktiWbuvlDwQLzU46wJ9s5gsp7'; style-src 'sha256-iBIWw+7cprw5c2U2feDUgzOLVk1XsD5o/MdLwECXabI='; base-uri 'none'; form-action 'none'; connect-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-OD2lzBcVpnurIUdYtOoF9/RjZX/ULAQZUGYe4Cv1wTQ=' 'sha384-0d+Gr7vM4Drod8E3hXKgciWJSWbjD/opKLLygI9ktiWbuvlDwQLzU46wJ9s5gsp7'; style-src 'sha256-iBIWw+7cprw5c2U2feDUgzOLVk1XsD5o/MdLwECXabI='; base-uri 'none'; form-action 'none'; connect-src 'self'">
   <title>Portfolio</title>
   <style>
     :root { color-scheme: dark; --background: #0f0f0f; --text: #f8fafc; --muted: #64748b; --line: #1e293b; --accent: #6366f1; --positive: #22c55e; --negative: #ef4444; }
@@ -173,6 +173,7 @@
       const palette = ["#6366f1", "#22c55e", "#f59e0b", "#38bdf8", "#ef4444", "#a78bfa", "#14b8a6", "#f97316"];
       let redrawChart = () => {};
       let redrawRing = () => {};
+      let snapshotLoadId = 0;
       let chartResizeObserver = null;
       window.addEventListener("resize", () => { redrawChart(); redrawRing(); });
 
@@ -224,6 +225,25 @@
         return JSON.parse(decodeURIComponent(bytes));
       }
 
+      function expandDeltaPoints(values) {
+        if (!Array.isArray(values) || values.length % 2 !== 0 || values.length > 200) return null;
+        if (values.length === 0) return [];
+        let timestamp = values[0];
+        let valueCents = values[1];
+        if (!Number.isSafeInteger(timestamp) || timestamp < 0 || !Number.isSafeInteger(valueCents) || valueCents < 0) return null;
+        const points = [[timestamp, valueCents / 100]];
+        for (let index = 2; index < values.length; index += 2) {
+          const timestampDelta = values[index];
+          const valueDeltaCents = values[index + 1];
+          if (!Number.isSafeInteger(timestampDelta) || timestampDelta <= 0 || !Number.isSafeInteger(valueDeltaCents)) return null;
+          timestamp += timestampDelta;
+          valueCents += valueDeltaCents;
+          if (!Number.isSafeInteger(timestamp) || !Number.isSafeInteger(valueCents) || valueCents < 0) return null;
+          points.push([timestamp, valueCents / 100]);
+        }
+        return points;
+      }
+
       function expandCompact(value) {
         if (!value || value.v !== 2 || typeof value.n !== "string" || typeof value.d !== "string" ||
           typeof value.c !== "string" || !Array.isArray(value.p) || !Array.isArray(value.r) || value.r.length !== periods.length) return null;
@@ -239,8 +259,11 @@
         const reportPeriods = {};
         periods.forEach((period, index) => {
           const entry = value.r[index];
-          if (Array.isArray(entry) && entry.length === 3)
-            reportPeriods[period] = { gain: entry[0], gainPct: entry[1], points: entry[2] };
+          if (Array.isArray(entry) && entry.length === 3) {
+            const points = value.q === 1 ? expandDeltaPoints(entry[2]) : entry[2];
+            if (Array.isArray(points))
+              reportPeriods[period] = { gain: entry[0], gainPct: entry[1], points };
+          }
         });
         if (periods.some(period => !reportPeriods[period])) return null;
         return { v: 2, name: value.n, date: value.d, currency: value.c, positions, periods: reportPeriods };
@@ -250,7 +273,11 @@
         if (!encoded || encoded.length > 60000) return null;
         try {
           let value;
-          if (encoded.startsWith("1.")) {
+          if (encoded.startsWith("4.")) {
+            const decompressed = LZString.decompressFromEncodedURIComponent(encoded.slice(2));
+            if (!decompressed) return null;
+            value = expandCompact(JSON.parse(decompressed));
+          } else if (encoded.startsWith("1.")) {
             const decompressed = LZString.decompressFromEncodedURIComponent(encoded.slice(2));
             if (!decompressed) return null;
             value = JSON.parse(decompressed);
@@ -315,7 +342,8 @@
         } catch { return null; }
       }
 
-      function renderSnapshot() {
+      async function renderSnapshot() {
+        const loadId = ++snapshotLoadId;
         document.title = "Portfolio";
         document.getElementById("name").textContent = "Portfolio";
         document.getElementById("date").dateTime = "";
@@ -329,7 +357,25 @@
         drawRing([]);
         document.getElementById("error").hidden = false;
         document.getElementById("portfolio").hidden = true;
-        const snapshot = readSnapshot(location.hash.startsWith("#d=") ? location.hash.slice(3) : "");
+        let encoded = location.hash.startsWith("#d=") ? location.hash.slice(3) : "";
+        if (!encoded) {
+          const id = new URLSearchParams(location.search).get("id");
+          if (!id || !/^[a-f0-9]{32}$/.test(id)) { redrawChart = () => {}; return; }
+          try {
+            const response = await fetch(`/api/share?id=${encodeURIComponent(id)}`, {
+              headers: { Accept: "application/json" },
+              cache: "no-store",
+            });
+            if (loadId !== snapshotLoadId || !response.ok) return;
+            const result = await response.json();
+            if (loadId !== snapshotLoadId || typeof result?.payload !== "string") return;
+            encoded = result.payload;
+          } catch {
+            return;
+          }
+        }
+        if (loadId !== snapshotLoadId) return;
+        const snapshot = readSnapshot(encoded);
         if (!snapshot) { redrawChart = () => {}; return; }
         const element = (tag, className, text) => {
           const node = document.createElement(tag);

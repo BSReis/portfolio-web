@@ -20,8 +20,8 @@ import { useSettings, Currency } from "../context/SettingsContext";
 import { usePortfolio } from "../context/PortfolioContext";
 import { BrokerType } from "../utils/importBroker";
 import {
+  createStoredPortfolioShareUrl,
   createPortfolioSnapshot,
-  portfolioShareUrl,
 } from "../utils/sharePortfolio";
 import { getStockQuote, effectivePrice } from "../services/api";
 
@@ -198,7 +198,7 @@ export default function SettingsScreen({ navigation }: Props) {
         }),
       );
       const snapshot = createPortfolioSnapshot(activePortfolioName, positions);
-      const url = portfolioShareUrl(
+      const url = await createStoredPortfolioShareUrl(
         `${window.location.origin}/share.html`,
         snapshot,
       );
