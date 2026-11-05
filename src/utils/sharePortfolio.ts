@@ -5,13 +5,19 @@ export interface PortfolioSnapshot {
   name: string;
   date: string;
   totalReturnPct?: number | null;
-  positions: Array<{ symbol: string; name: string; weight: number }>;
+  positions: Array<{
+    symbol: string;
+    name: string;
+    weight: number;
+    returnPct?: number | null;
+  }>;
 }
 
 export interface SharePositionValue {
   symbol: string;
   name: string;
   value: number;
+  returnPct?: number | null;
 }
 
 export const DEFAULT_PUBLIC_SHARE_URL =
@@ -66,6 +72,9 @@ export function createPortfolioSnapshot(
       symbol: position.symbol,
       name: position.name,
       weight: points / 100,
+      ...(position.returnPct === undefined
+        ? {}
+        : { returnPct: position.returnPct }),
     })),
   });
   if (!snapshot) throw new Error("The portfolio snapshot is invalid.");
@@ -117,6 +126,10 @@ export function readPortfolioSnapshot(
       !Number.isFinite(position.weight) ||
       position.weight < 0 ||
       position.weight > 100 ||
+      (position.returnPct !== undefined &&
+        position.returnPct !== null &&
+        (typeof position.returnPct !== "number" ||
+          !Number.isFinite(position.returnPct))) ||
       Math.abs(position.weight * 100 - Math.round(position.weight * 100)) >
         0.000001
     )
@@ -125,6 +138,9 @@ export function readPortfolioSnapshot(
       symbol: position.symbol,
       name: position.name,
       weight: position.weight,
+      ...(position.returnPct === undefined
+        ? {}
+        : { returnPct: position.returnPct as number | null }),
     });
   }
   if (

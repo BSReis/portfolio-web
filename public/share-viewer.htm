@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex, nofollow">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-CUevkxlDaovM5ip/eH74Xi3+SjvO0npQu52JkrjbYg0=' 'sha384-0d+Gr7vM4Drod8E3hXKgciWJSWbjD/opKLLygI9ktiWbuvlDwQLzU46wJ9s5gsp7'; style-src 'sha256-WVOBvhSaGzCGRN3hppIAhOzriYbVD+/+1d0S063dRDc='; img-src https://images.financialmodelingprep.com; base-uri 'none'; form-action 'none'; connect-src 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-pOkHml+4M9+QoIaeaUwaPNO0v1PFglP/3vrmb+AyOc8=' 'sha384-0d+Gr7vM4Drod8E3hXKgciWJSWbjD/opKLLygI9ktiWbuvlDwQLzU46wJ9s5gsp7'; style-src 'sha256-pc7KGXGf08ugno81uIdEg6opxRatlyje0vZOkk2cMzk='; img-src https://images.financialmodelingprep.com; base-uri 'none'; form-action 'none'; connect-src 'self'">
   <title>Portfolio</title>
   <style>
     :root { color-scheme: dark; --background: #0f0f0f; --text: #f8fafc; --muted: #64748b; --line: #1e293b; --accent: #6366f1; --positive: #22c55e; --negative: #ef4444; }
@@ -49,6 +49,9 @@
     #columns.is-report th:nth-child(2) { width: 80px; }
     #columns.is-report th:nth-child(3) { width: 140px; }
     #columns.is-report th:last-child { width: 150px; }
+    #columns.is-allocation th:nth-child(2), #columns.is-allocation th:nth-child(3) { text-align: right; }
+    #columns.is-allocation th:nth-child(2) { width: 80px; }
+    #columns.is-allocation th:nth-child(3) { width: 100px; }
     #positions td:nth-child(2), #positions td:nth-child(3), #positions td:nth-child(4) { text-align: right; }
     .eyebrow { color: var(--accent); font-size: 12px; font-weight: 600; margin: 0 0 12px; }
     h1 { font: inherit; font-size: 36px; font-weight: 600; line-height: 1.2; margin: 0 0 18px; overflow-wrap: anywhere; }
@@ -100,6 +103,8 @@
       #columns.is-report th:nth-child(2) { width: 56px; }
       #columns.is-report th:nth-child(3) { width: 92px; }
       #columns.is-report th:last-child { width: 96px; }
+      #columns.is-allocation th:nth-child(2) { width: 68px; }
+      #columns.is-allocation th:nth-child(3) { width: 82px; }
       tbody th, tbody td { padding: 13px 0; }
       .holding { gap: 7px; padding-right: 6px; }
       .symbol { font-size: 12px; }
@@ -323,9 +328,14 @@
             if (!position || typeof position.symbol !== "string" || !position.symbol.trim() || position.symbol.length > 40 ||
               typeof position.name !== "string" || !position.name.trim() || position.name.length > 120 ||
               typeof position.weight !== "number" || !Number.isFinite(position.weight) || position.weight < 0 || position.weight > 100 ||
+              (value.v === 1 && position.returnPct !== undefined && position.returnPct !== null &&
+                (typeof position.returnPct !== "number" || !Number.isFinite(position.returnPct))) ||
               Math.abs(position.weight * 100 - Math.round(position.weight * 100)) > 0.000001) return null;
             if (value.v === 1) {
-              positions.push({ symbol: position.symbol, name: position.name, weight: position.weight });
+              positions.push({
+                symbol: position.symbol, name: position.name, weight: position.weight,
+                ...(position.returnPct === undefined ? {} : { returnPct: position.returnPct }),
+              });
               continue;
             }
             if (typeof position.shares !== "number" || !Number.isFinite(position.shares) || position.shares < 0 ||
@@ -459,14 +469,17 @@
             if (metric.gain !== null) pnl.className += metric.gain >= 0 ? " gain-positive" : " gain-negative";
             row.append(heading, allocation, positionValue, pnl);
           } else {
-            row.append(heading, allocation);
+            const result = position.returnPct;
+            const returnCell = element("td", result == null ? "" : result >= 0 ? "gain-positive" : "gain-negative");
+            returnCell.append(element("div", "gain-main", result == null ? "N/A" : formatPercent(result)));
+            row.append(heading, allocation, returnCell);
           }
           rows.push(row);
         });
         document.getElementById("positions").replaceChildren(...rows);
         const columns = document.getElementById("columns");
-        columns.className = snapshot.v === 2 ? "is-report" : "";
-        const headings = snapshot.v === 2 ? ["Holding", "Weight", "Position", "P/L"] : ["Holding", "Weight"];
+        columns.className = snapshot.v === 2 ? "is-report" : "is-allocation";
+        const headings = snapshot.v === 2 ? ["Holding", "Weight", "Position", "P/L"] : ["Holding", "Weight", "Return"];
         columns.replaceChildren(...headings.map((label) => {
           const heading = element("th", "", label);
           heading.scope = "col";

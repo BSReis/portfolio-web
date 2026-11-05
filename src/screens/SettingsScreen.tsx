@@ -190,10 +190,17 @@ export default function SettingsScreen({ navigation }: Props) {
             );
           let price = cash ? 1 : Number.NaN;
           if (!cash && quote) price = effectivePrice(quote);
+          const value = holding.shares * price * getRateFor(nativeCurrency);
+          const cost =
+            holding.avgPrice *
+            getRateFor(holding.currency ?? "USD") *
+            holding.shares;
           return {
             symbol: holding.symbol,
             name: holding.name,
-            value: holding.shares * price * getRateFor(nativeCurrency),
+            value,
+            returnPct:
+              cash || cost <= 0 ? null : ((value - cost) / cost) * 100,
           };
         }),
       );
