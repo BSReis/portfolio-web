@@ -197,7 +197,20 @@ export default function SettingsScreen({ navigation }: Props) {
           };
         }),
       );
-      const snapshot = createPortfolioSnapshot(activePortfolioName, positions);
+      const totalValue = positions.reduce((sum, position) => sum + position.value, 0);
+      const totalCost = holdings.reduce(
+        (sum, holding) =>
+          sum + holding.avgPrice * getRateFor(holding.currency ?? "USD") * holding.shares,
+        0,
+      );
+      const totalReturnPct =
+        totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : null;
+      const snapshot = createPortfolioSnapshot(
+        activePortfolioName,
+        positions,
+        undefined,
+        totalReturnPct,
+      );
       const url = await createStoredPortfolioShareUrl(
         `${window.location.origin}/share.html`,
         snapshot,
