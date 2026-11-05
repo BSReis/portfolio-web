@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex, nofollow">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-2sKNLxGEZwvO8FLHvaqiHtgKOnJlWGBtBYqLgOxr8sU=' 'sha384-0d+Gr7vM4Drod8E3hXKgciWJSWbjD/opKLLygI9ktiWbuvlDwQLzU46wJ9s5gsp7'; style-src 'sha256-HCl89J+1uZxJ5PIesqVwvNh16Xrc3PwhiWG4t/zW79E='; img-src https://images.financialmodelingprep.com; base-uri 'none'; form-action 'none'; connect-src 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-gF+9BFyokwewu6+lenHRHLAtgArmxSAFNub7ATcGNk4=' 'sha384-0d+Gr7vM4Drod8E3hXKgciWJSWbjD/opKLLygI9ktiWbuvlDwQLzU46wJ9s5gsp7'; style-src 'sha256-bYZnttl/8INM2KpJGL6zptkidPz5twtyEnu+iqULdgc='; img-src https://images.financialmodelingprep.com; base-uri 'none'; form-action 'none'; connect-src 'self'">
   <title>Portfolio</title>
   <style>
     :root { color-scheme: dark; --background: #0f0f0f; --text: #f8fafc; --muted: #64748b; --line: #1e293b; --accent: #6366f1; --positive: #22c55e; --negative: #ef4444; }
@@ -26,6 +26,7 @@
     .report-gain strong { font-weight: 600; }
     .report-gain span { color: var(--muted); font-size: 13px; }
     .allocation-return { display: flex; align-items: baseline; gap: 8px; margin: 12px 0 0; color: var(--muted); font-size: 13px; }
+    .allocation-return[hidden] { display: none; }
     .allocation-return strong { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
     .report-value { color: var(--text); font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; margin: 0 0 3px; }
     .chart-wrap { min-height: 220px; position: relative; margin: 0; }
@@ -65,17 +66,9 @@
     tbody th { font-weight: 400; text-align: left; }
     .holding { display: flex; align-items: center; gap: 12px; min-width: 0; padding-right: 16px; }
     .position-identity { min-width: 0; }
-    .holding-logo-wrap { position: relative; display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 42px; overflow: hidden; border-radius: 10px; background: #1e293b; }
-    .holding-logo { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 10px; object-fit: contain; }
-    .holding-logo-fallback { display: grid; place-items: center; width: 100%; height: 100%; color: #fff; font-size: 10px; font-weight: 600; }
-    .holding-logo-fallback-0 { background: #6366f1; }
-    .holding-logo-fallback-1 { background: #22c55e; }
-    .holding-logo-fallback-2 { background: #f59e0b; }
-    .holding-logo-fallback-3 { background: #38bdf8; }
-    .holding-logo-fallback-4 { background: #ef4444; }
-    .holding-logo-fallback-5 { background: #a78bfa; }
-    .holding-logo-fallback-6 { background: #14b8a6; }
-    .holding-logo-fallback-7 { background: #f97316; }
+    .holding-logo-wrap { position: relative; display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 42px; overflow: hidden; border-radius: 50%; background: transparent; }
+    .holding-logo { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; object-fit: contain; }
+    .holding-logo-fallback { display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%; background: transparent; color: var(--muted); font-size: 10px; font-weight: 600; }
     .symbol { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
     .company { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
     .shares { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
@@ -208,6 +201,30 @@
           context.fill();
           start = end;
         });
+      }
+
+      function createHoldingLogo(symbol, element) {
+        const logoWrap = element("span", "holding-logo-wrap");
+        logoWrap.setAttribute("aria-hidden", "true");
+        const fallbackText = symbol.startsWith("CASH_")
+          ? symbol.slice(5, 8)
+          : symbol.replace(/[^a-z0-9]/gi, "").slice(0, 2).toUpperCase();
+        const logoFallback = element("span", "holding-logo-fallback", fallbackText);
+        logoFallback.hidden = false;
+        if (symbol.startsWith("CASH_")) {
+          logoWrap.append(logoFallback);
+        } else {
+          const logo = element("img", "holding-logo");
+          logo.alt = "";
+          logo.loading = "lazy";
+          logo.referrerPolicy = "no-referrer";
+          logo.hidden = false;
+          logo.addEventListener("load", () => { logoFallback.hidden = true; });
+          logo.addEventListener("error", () => { logo.hidden = true; logoFallback.hidden = false; });
+          logo.src = `https://images.financialmodelingprep.com/symbol/${encodeURIComponent(symbol)}.png`;
+          logoWrap.append(logoFallback, logo);
+        }
+        return logoWrap;
       }
 
       function decodeCompact(encoded) {
@@ -420,30 +437,10 @@
           const heading = element("th");
           heading.scope = "row";
           const holding = element("div", "holding");
-          const logoWrap = element("span", "holding-logo-wrap");
-          logoWrap.setAttribute("aria-hidden", "true");
-          const fallbackText = position.symbol.startsWith("CASH_")
-            ? position.symbol.slice(5, 8)
-            : position.symbol.replace(/[^a-z0-9]/gi, "").slice(0, 2).toUpperCase();
-          const logoFallback = element("span", `holding-logo-fallback holding-logo-fallback-${index % palette.length}`, fallbackText);
-          logoFallback.hidden = false;
-          if (position.symbol.startsWith("CASH_")) {
-            logoWrap.append(logoFallback);
-          } else {
-            const logo = element("img", "holding-logo");
-            logo.alt = "";
-            logo.loading = "lazy";
-            logo.referrerPolicy = "no-referrer";
-            logo.hidden = false;
-            logo.addEventListener("load", () => { logoFallback.hidden = true; });
-            logo.addEventListener("error", () => { logo.hidden = true; logoFallback.hidden = false; });
-            logo.src = `https://images.financialmodelingprep.com/symbol/${encodeURIComponent(position.symbol)}.png`;
-            logoWrap.append(logoFallback, logo);
-          }
           const identity = element("div", "position-identity");
           identity.append(element("div", "symbol", position.symbol), element("div", "company", position.name));
           if (snapshot.v === 2) identity.append(element("div", "shares", formatShares(position.shares) + " shares"));
-          holding.append(logoWrap, identity);
+          holding.append(createHoldingLogo(position.symbol, element), identity);
           heading.append(holding);
           const allocation = element("td");
           allocation.append(element("div", "weight", position.weight.toFixed(2) + "%"));
@@ -636,18 +633,13 @@
             const order = leftMetric - rightMetric;
             return sortAscending ? order : -order;
           });
-          const colorBySymbol = new Map(snapshot.positions.map((position, index) => [
-            position.symbol,
-            index % palette.length,
-          ]));
           orderedPositions.forEach(position => {
             const row = element("tr");
             const heading = element("th"); heading.scope = "row";
             const holding = element("div", "holding");
-            const swatch = element("span", `swatch swatch-${colorBySymbol.get(position.symbol) ?? 0}`);
             const identity = element("div", "position-identity");
             identity.append(element("div", "symbol", position.symbol), element("div", "company", position.name), element("div", "shares", formatShares(position.shares) + (position.symbol.startsWith("CASH_") ? " cash" : " shares")));
-            holding.append(swatch, identity); heading.append(holding);
+            holding.append(createHoldingLogo(position.symbol, element), identity); heading.append(holding);
             const weight = element("td"); weight.append(element("div", "weight", position.weight.toFixed(2) + "%"));
             const value = element("td");
             value.append(element("div", "position-value", formatCurrency(position.value, snapshot.currency)));
