@@ -24,14 +24,23 @@ function isValidSharePayload(payload: string): boolean {
   if (payload.startsWith("1.")) return decodePortfolioShare(payload) !== null;
   if (!payload.startsWith("4.")) return false;
   try {
-    const decoded = LZString.decompressFromEncodedURIComponent(payload.slice(2));
+    const decoded = LZString.decompressFromEncodedURIComponent(
+      payload.slice(2),
+    );
     if (!decoded) return false;
     const value = JSON.parse(decoded) as Record<string, unknown>;
-    return value.v === 2 && value.q === 1 &&
-      typeof value.n === "string" && typeof value.d === "string" &&
-      typeof value.c === "string" && Array.isArray(value.p) &&
-      value.p.length > 0 && value.p.length <= 100 && Array.isArray(value.r) &&
-      value.r.length === PERIOD_COUNT;
+    return (
+      value.v === 2 &&
+      value.q === 1 &&
+      typeof value.n === "string" &&
+      typeof value.d === "string" &&
+      typeof value.c === "string" &&
+      Array.isArray(value.p) &&
+      value.p.length > 0 &&
+      value.p.length <= 100 &&
+      Array.isArray(value.r) &&
+      value.r.length === PERIOD_COUNT
+    );
   } catch {
     return false;
   }
@@ -52,7 +61,9 @@ export default async function handler(
   if (request.method === "POST") {
     const payload = (request.body as ShareRequest | undefined)?.payload;
     if (typeof payload !== "string" || !isValidSharePayload(payload))
-      return response.status(400).json({ error: "Invalid portfolio snapshot." });
+      return response
+        .status(400)
+        .json({ error: "Invalid portfolio snapshot." });
 
     const id = randomBytes(16).toString("hex");
     const record: StoredShare = {
@@ -70,7 +81,9 @@ export default async function handler(
       });
       return response.status(201).json({ id, expiresAt: record.expiresAt });
     } catch {
-      return response.status(503).json({ error: "Portfolio sharing storage is unavailable." });
+      return response
+        .status(503)
+        .json({ error: "Portfolio sharing storage is unavailable." });
     }
   }
 
@@ -85,21 +98,36 @@ export default async function handler(
         useCache: false,
       });
       if (!blob || blob.statusCode !== 200 || !blob.stream)
-        return response.status(404).json({ error: "Shared portfolio not found." });
+        return response
+          .status(404)
+          .json({ error: "Shared portfolio not found." });
 
-      const record = JSON.parse(await new Response(blob.stream).text()) as StoredShare;
-      if (record.version !== 1 || typeof record.payload !== "string" ||
-        !Number.isSafeInteger(record.expiresAt))
-        return response.status(404).json({ error: "Shared portfolio not found." });
+      const record = JSON.parse(
+        await new Response(blob.stream).text(),
+      ) as StoredShare;
+      if (
+        record.version !== 1 ||
+        typeof record.payload !== "string" ||
+        !Number.isSafeInteger(record.expiresAt)
+      )
+        return response
+          .status(404)
+          .json({ error: "Shared portfolio not found." });
       if (record.expiresAt <= Date.now()) {
         await del(sharePath(id)).catch(() => {});
-        return response.status(410).json({ error: "This share link has expired." });
+        return response
+          .status(410)
+          .json({ error: "This share link has expired." });
       }
       if (!isValidSharePayload(record.payload))
-        return response.status(404).json({ error: "Shared portfolio not found." });
+        return response
+          .status(404)
+          .json({ error: "Shared portfolio not found." });
       return response.status(200).json({ payload: record.payload });
     } catch {
-      return response.status(503).json({ error: "Portfolio sharing storage is unavailable." });
+      return response
+        .status(503)
+        .json({ error: "Portfolio sharing storage is unavailable." });
     }
   }
 

@@ -197,7 +197,11 @@ export async function createStoredPortfolioShareUrl(
   } catch {
     throw new Error("Set the public share page URL in Settings first.");
   }
-  if (!["https:", "http:"].includes(page.protocol) || page.username || page.password)
+  if (
+    !["https:", "http:"].includes(page.protocol) ||
+    page.username ||
+    page.password
+  )
     throw new Error("Use an HTTP or HTTPS share page without credentials.");
   let response: Response;
   try {
@@ -207,7 +211,9 @@ export async function createStoredPortfolioShareUrl(
       body: JSON.stringify({ payload: encodePortfolioShare(snapshot) }),
     });
   } catch {
-    throw new Error("Could not create a short share link. Check the web share service.");
+    throw new Error(
+      "Could not create a short share link. Check the web share service.",
+    );
   }
   if (!response.ok)
     throw new Error("Could not create a short share link. Please try again.");

@@ -33,6 +33,8 @@ export default async function handler(
     } while (cursor);
     return response.status(200).json({ deleted });
   } catch {
-    return response.status(503).json({ error: "Share cleanup is unavailable." });
+    return response
+      .status(503)
+      .json({ error: "Share cleanup is unavailable." });
   }
 }
