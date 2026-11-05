@@ -1,3 +1,5 @@
+import * as LZString from "lz-string";
+
 export interface PortfolioSnapshot {
   v: 1;
   name: string;
@@ -14,7 +16,7 @@ export interface SharePositionValue {
 export const DEFAULT_PUBLIC_SHARE_URL =
   "https://portfolio-web-dhqc.vercel.app/share.html";
 
-const MAX_LINK_LENGTH = 12000;
+const MAX_LINK_LENGTH = 60000;
 
 export function createPortfolioSnapshot(
   name: string,
@@ -137,7 +139,7 @@ export function readPortfolioSnapshot(
 export function encodePortfolioShare(snapshot: PortfolioSnapshot): string {
   const safe = readPortfolioSnapshot(snapshot);
   if (!safe) throw new Error("The portfolio snapshot is invalid.");
-  const encoded = encodeURIComponent(JSON.stringify(safe));
+  const encoded = `1.${LZString.compressToEncodedURIComponent(JSON.stringify(safe))}`;
   if (encoded.length > MAX_LINK_LENGTH)
     throw new Error("The portfolio is too large for a share link.");
   return encoded;
@@ -148,6 +150,11 @@ export function decodePortfolioShare(
 ): PortfolioSnapshot | null {
   if (encoded.length > MAX_LINK_LENGTH) return null;
   try {
+    if (encoded.startsWith("1.")) {
+      const decompressed = LZString.decompressFromEncodedURIComponent(encoded.slice(2));
+      if (!decompressed) return null;
+      return readPortfolioSnapshot(JSON.parse(decompressed));
+    }
     return readPortfolioSnapshot(JSON.parse(decodeURIComponent(encoded)));
   } catch {
     return null;
