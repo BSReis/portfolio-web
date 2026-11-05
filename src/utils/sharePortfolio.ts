@@ -4,6 +4,7 @@ export interface PortfolioSnapshot {
   v: 1;
   name: string;
   date: string;
+  totalReturnPct?: number | null;
   positions: Array<{ symbol: string; name: string; weight: number }>;
 }
 
@@ -22,6 +23,7 @@ export function createPortfolioSnapshot(
   name: string,
   positions: readonly SharePositionValue[],
   date = new Date().toISOString(),
+  totalReturnPct?: number | null,
 ): PortfolioSnapshot {
   if (!positions.length || positions.length > 100)
     throw new Error("Share between 1 and 100 positions.");
@@ -59,6 +61,7 @@ export function createPortfolioSnapshot(
     v: 1,
     name: name.trim().slice(0, 80),
     date,
+    ...(totalReturnPct === undefined ? {} : { totalReturnPct }),
     positions: allocations.map(({ position, points }) => ({
       symbol: position.symbol,
       name: position.name,
@@ -79,6 +82,13 @@ export function readPortfolioSnapshot(
     typeof candidate.name !== "string" ||
     !candidate.name.trim() ||
     candidate.name.length > 80
+  )
+    return null;
+  if (
+    candidate.totalReturnPct !== undefined &&
+    candidate.totalReturnPct !== null &&
+    (typeof candidate.totalReturnPct !== "number" ||
+      !Number.isFinite(candidate.totalReturnPct))
   )
     return null;
   if (
@@ -132,6 +142,9 @@ export function readPortfolioSnapshot(
     v: 1,
     name: candidate.name,
     date: new Date(candidate.date).toISOString(),
+    ...(candidate.totalReturnPct === undefined
+      ? {}
+      : { totalReturnPct: candidate.totalReturnPct as number | null }),
     positions,
   };
 }
