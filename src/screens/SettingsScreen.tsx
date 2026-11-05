@@ -199,8 +199,7 @@ export default function SettingsScreen({ navigation }: Props) {
             symbol: holding.symbol,
             name: holding.name,
             value,
-            returnPct:
-              cash || cost <= 0 ? null : ((value - cost) / cost) * 100,
+            returnPct: cash || cost <= 0 ? null : ((value - cost) / cost) * 100,
           };
         }),
       );
