@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex, nofollow">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-01xKU6fuqXb1CEnjyEuNf0xQ/GsSg0aNANBiQRBKgOE='; style-src 'sha256-iBIWw+7cprw5c2U2feDUgzOLVk1XsD5o/MdLwECXabI='; base-uri 'none'; form-action 'none'; connect-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Cn/vPxDap43baIYuawsPfQpMemh9qJDM5LWrtSqUAcc=' 'sha384-0d+Gr7vM4Drod8E3hXKgciWJSWbjD/opKLLygI9ktiWbuvlDwQLzU46wJ9s5gsp7'; style-src 'sha256-iBIWw+7cprw5c2U2feDUgzOLVk1XsD5o/MdLwECXabI='; base-uri 'none'; form-action 'none'; connect-src 'none'">
   <title>Portfolio</title>
   <style>
     :root { color-scheme: dark; --background: #0f0f0f; --text: #f8fafc; --muted: #64748b; --line: #1e293b; --accent: #6366f1; --positive: #22c55e; --negative: #ef4444; }
@@ -165,6 +165,7 @@
       </table>
     </section>
   </main>
+  <script src="lz-string.min.js" integrity="sha384-0d+Gr7vM4Drod8E3hXKgciWJSWbjD/opKLLygI9ktiWbuvlDwQLzU46wJ9s5gsp7"></script>
   <script>
     (function () {
       "use strict";
@@ -248,7 +249,16 @@
       function readSnapshot(encoded) {
         if (!encoded || encoded.length > 60000) return null;
         try {
-          let value = encoded.startsWith("2.") ? expandCompact(decodeCompact(encoded.slice(2))) : JSON.parse(decodeURIComponent(encoded));
+          let value;
+          if (encoded.startsWith("3.")) {
+            const decompressed = LZString.decompressFromEncodedURIComponent(encoded.slice(2));
+            if (!decompressed) return null;
+            value = expandCompact(JSON.parse(decompressed));
+          } else if (encoded.startsWith("2.")) {
+            value = expandCompact(decodeCompact(encoded.slice(2)));
+          } else {
+            value = JSON.parse(decodeURIComponent(encoded));
+          }
           if (!value || ![1, 2].includes(value.v) || typeof value.name !== "string" || !value.name.trim() || value.name.length > 80 ||
             typeof value.date !== "string" || !Number.isFinite(Date.parse(value.date)) ||
             !Array.isArray(value.positions) || !value.positions.length || value.positions.length > 100) return null;
